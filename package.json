@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "shogun-contracts-sdk": "^1.0.4",
-    "shogun-relay-sdk": "^1.0.0"
+    "shogun-relay-sdk": "^1.0.1"
   }
 }
-
