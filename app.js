@@ -198,7 +198,12 @@ async function loadNetworkConfig() {
     return;
   }
 
-  provider = new ethers.JsonRpcProvider(config.rpc);
+  // Use BrowserProvider if wallet is connected, otherwise JsonRpcProvider
+  if (window.ethereum && !provider) {
+    provider = new ethers.BrowserProvider(window.ethereum);
+  } else if (!provider) {
+    provider = new ethers.JsonRpcProvider(config.rpc);
+  }
   
   try {
     sdk = new ShogunSDK({
@@ -209,7 +214,8 @@ async function loadNetworkConfig() {
     
     gunL2Bridge = sdk.getGunL2Bridge();
     
-    if (signer) {
+    if (signer && provider instanceof ethers.BrowserProvider) {
+      // Update signer if using BrowserProvider
       signer = await provider.getSigner();
       if (sdk) {
         sdk.setSigner(signer);
@@ -273,6 +279,11 @@ async function connectWallet() {
   try {
     const restoreButton = setButtonLoading('connectWallet', 'Connecting...');
     
+    // Initialize provider with BrowserProvider for wallet connection
+    if (!provider || !(provider instanceof ethers.BrowserProvider)) {
+      provider = new ethers.BrowserProvider(window.ethereum);
+    }
+    
     // Request account access
     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
     if (accounts.length === 0) {
@@ -282,6 +293,12 @@ async function connectWallet() {
     connectedAddress = accounts[0];
     signer = await provider.getSigner();
     
+    if (sdk) {
+      sdk.setSigner(signer);
+      gunL2Bridge = sdk.getGunL2Bridge();
+    }
+
+    // Update SDK with signer
     if (sdk) {
       sdk.setSigner(signer);
       gunL2Bridge = sdk.getGunL2Bridge();
