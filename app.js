@@ -292,9 +292,52 @@ async function connectWallet() {
     connectedAddress = accounts[0];
     signer = await provider.getSigner();
     
-    if (sdk) {
-      sdk.setSigner(signer);
-      gunL2Bridge = sdk.getGunL2Bridge();
+    // Check network - must be Base Sepolia (84532)
+    const network = await provider.getNetwork();
+    const expectedChainId = 84532; // Base Sepolia
+    
+    if (Number(network.chainId) !== expectedChainId) {
+      restoreButton();
+      showMessage('error', `Please switch to Base Sepolia (Chain ID: ${expectedChainId})`);
+      
+      // Try to switch network
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: `0x${expectedChainId.toString(16)}` }],
+        });
+        // Retry connection after switch
+        setTimeout(() => connectWallet(), 1000);
+        return;
+      } catch (switchError) {
+        // If switch fails, try to add network
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: `0x${expectedChainId.toString(16)}`,
+                chainName: 'Base Sepolia',
+                nativeCurrency: {
+                  name: 'ETH',
+                  symbol: 'ETH',
+                  decimals: 18,
+                },
+                rpcUrls: ['https://sepolia.base.org'],
+                blockExplorerUrls: ['https://sepolia.basescan.org'],
+              }],
+            });
+            // Retry connection after adding
+            setTimeout(() => connectWallet(), 1000);
+            return;
+          } catch (addError) {
+            showMessage('error', 'Please add Base Sepolia network manually in MetaMask');
+            return;
+          }
+        }
+        showMessage('error', 'Please switch to Base Sepolia network manually');
+        return;
+      }
     }
 
     // Update SDK with signer

@@ -1,6 +1,8 @@
 # Shogun L2 Bridge App
 
-Una semplice applicazione web per gestire depositi, prelievi e trasferimenti di ETH tra L1 (Ethereum/Base) e L2 (GunDB) utilizzando il bridge Shogun.
+Una semplice applicazione web per gestire depositi, prelievi e trasferimenti di ETH tra L1 (Base Sepolia) e L2 (GunDB) utilizzando il bridge Shogun.
+
+**Network**: Base Sepolia (Chain ID: 84532)
 
 ## Funzionalità
 
