@@ -6,16 +6,13 @@ import { ShogunSDK } from 'shogun-contracts-sdk';
 import ShogunRelaySDK from 'shogun-relay-sdk';
 
 // Contract addresses and RPC endpoints
+// Base Sepolia (chainId: 84532)
 const CONTRACTS = {
   84532: {
+    name: 'Base Sepolia',
     gunL2Bridge: '0x429E4559e154E9F9fb86A9587769E99F65aFc1dE',
     rpc: 'https://sepolia.base.org',
     explorer: 'https://sepolia.basescan.org',
-  },
-  8453: {
-    gunL2Bridge: null, // TBD
-    rpc: 'https://mainnet.base.org',
-    explorer: 'https://basescan.org',
   },
 };
 
@@ -26,7 +23,7 @@ const DEFAULT_RELAY_ENDPOINT = 'http://localhost:8765';
 let provider = null;
 let signer = null;
 let connectedAddress = null;
-let currentChainId = 84532;
+let currentChainId = 84532; // Base Sepolia
 let sdk = null; // ShogunSDK instance
 let gunL2Bridge = null; // GunL2Bridge instance from SDK
 let relaySDK = null; // ShogunRelaySDK instance
@@ -192,9 +189,11 @@ async function createDualSignatures(message) {
  * Initialize network configuration
  */
 async function loadNetworkConfig() {
+  // Force Base Sepolia
+  currentChainId = 84532;
   const config = CONTRACTS[currentChainId];
   if (!config || !config.gunL2Bridge) {
-    showMessage('error', `GunL2Bridge not deployed on chain ${currentChainId}`);
+    showMessage('error', `GunL2Bridge not deployed on Base Sepolia`);
     return;
   }
 
