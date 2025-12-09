@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="shogun-dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shogun Protocol - L2 Bridge</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+  <!-- Gun.js and SEA for encryption - MUST be loaded before shogun-core -->
+  <script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1241/gun.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gun@0.2020.1241/sea.js"></script>
+  <!-- Shogun Core - MUST be loaded after Gun.js -->
+  <script src="https://cdn.jsdelivr.net/npm/shogun-core@6.5.5/dist/browser/shogun-core.js"></script>
+  <style>
+    body {
+      line-height: 1.6;
+      background: linear-gradient(135deg, #1A1A1A 0%, #0D0D0D 100%);
+      min-height: 100vh;
+    }
+
+    .hero-gradient {
+      background: radial-gradient(ellipse at top, rgba(66, 165, 245, 0.08) 0%, transparent 60%);
+    }
+
+    .card {
+      background-color: rgba(40, 40, 40, 0.5);
+      border: 1px solid #404040;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: #606060;
+    }
+
+    .stat-card {
+      background-color: rgba(40, 40, 40, 0.5);
+      border: 1px solid #404040;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #42A5F5;
+    }
+
+    .stat-label {
+      font-size: 0.875rem;
+      color: #A0A0A0;
+    }
+
+    .message {
+      padding: 1.5rem;
+      border-radius: 1rem;
+      margin-top: 1.5rem;
+      display: none;
+    }
+
+    .message.success {
+      background-color: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.3);
+      color: #4CAF50;
+    }
+
+    .message.error {
+      background-color: rgba(244, 67, 54, 0.2);
+      border: 1px solid rgba(244, 67, 54, 0.3);
+      color: #F44336;
+    }
+
+    .message.info {
+      background-color: rgba(66, 165, 245, 0.2);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      color: #42A5F5;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 2px solid #404040;
+      border-radius: 50%;
+      border-top-color: #42A5F5;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .input-field {
+      background-color: #1A1A1A;
+      border: 1px solid #404040;
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      color: #FFFFFF;
+      width: 100%;
+      transition: all 0.3s ease;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: #42A5F5;
+    }
+
+    .tab-button {
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      background-color: transparent;
+      color: #A0A0A0;
+      border: 1px solid transparent;
+    }
+
+    .tab-button:hover {
+      background-color: rgba(66, 165, 245, 0.1);
+    }
+
+    .tab-button.active {
+      background-color: rgba(66, 165, 245, 0.2);
+      color: #42A5F5;
+      border-color: #42A5F5;
+    }
+
+    .withdrawal-item {
+      background-color: rgba(40, 40, 40, 0.5);
+      border: 1px solid #404040;
+      border-radius: 0.75rem;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .withdrawal-item.pending {
+      border-left: 4px solid #FF9800;
+    }
+
+    .withdrawal-item.ready {
+      border-left: 4px solid #4CAF50;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="hero-gradient rounded-3xl p-8 mb-8">
+      <h1 class="text-4xl font-bold text-white mb-2">Shogun L2 Bridge</h1>
+      <p class="text-gray-400">Trustless ETH transfers between L1 and L2</p>
+    </div>
+
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="card mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-400 text-sm">Wallet Status</p>
+          <p id="walletAddress" class="text-white font-mono text-sm">Not connected</p>
+        </div>
+        <button id="connectWallet" class="btn btn-primary">Connect Wallet</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="stat-card">
+        <div class="stat-value" id="l2Balance">0 ETH</div>
+        <div class="stat-label">L2 Balance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="l1Balance">0 ETH</div>
+        <div class="stat-label">L1 Balance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="bridgeBalance">0 ETH</div>
+        <div class="stat-label">Bridge Contract</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-6 border-b border-gray-700">
+      <button class="tab-button active" data-tab="deposit">Deposit (L1→L2)</button>
+      <button class="tab-button" data-tab="withdraw">Withdraw (L2→L1)</button>
+      <button class="tab-button" data-tab="transfer">Transfer (L2→L2)</button>
+      <button class="tab-button" data-tab="withdrawals">Pending Withdrawals</button>
+    </div>
+
+    <!-- Deposit Tab -->
+    <div id="tab-deposit" class="tab-content">
+      <div class="card">
+        <h2 class="text-xl font-semibold text-white mb-4">Deposit ETH to L2</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-gray-400 text-sm mb-2">Amount (ETH)</label>
+            <input type="number" id="depositAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
+          </div>
+          <button id="depositBtn" class="btn btn-primary w-full">Deposit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Withdraw Tab -->
+    <div id="tab-withdraw" class="tab-content hidden">
+      <div class="card">
+        <h2 class="text-xl font-semibold text-white mb-4">Withdraw ETH from L2</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-gray-400 text-sm mb-2">Amount (ETH)</label>
+            <input type="number" id="withdrawAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
+          </div>
+          <div>
+            <label class="block text-gray-400 text-sm mb-2">Nonce (unique identifier)</label>
+            <input type="number" id="withdrawNonce" class="input-field" placeholder="0" min="0" />
+          </div>
+          <button id="requestWithdrawBtn" class="btn btn-primary w-full">Request Withdrawal</button>
+          <div id="withdrawProofSection" class="hidden">
+            <div class="mt-4 p-4 bg-gray-800 rounded-lg">
+              <p class="text-sm text-gray-400 mb-2">Withdrawal queued. Waiting for batch submission...</p>
+              <button id="checkProofBtn" class="btn btn-secondary w-full mt-2">Check Proof & Withdraw</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transfer Tab -->
+    <div id="tab-transfer" class="tab-content hidden">
+      <div class="card">
+        <h2 class="text-xl font-semibold text-white mb-4">Transfer ETH (L2 → L2)</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-gray-400 text-sm mb-2">To Address</label>
+            <input type="text" id="transferTo" class="input-field" placeholder="0x..." />
+          </div>
+          <div>
+            <label class="block text-gray-400 text-sm mb-2">Amount (ETH)</label>
+            <input type="number" id="transferAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
+          </div>
+          <button id="transferBtn" class="btn btn-primary w-full">Transfer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Withdrawals Tab -->
+    <div id="tab-withdrawals" class="tab-content hidden">
+      <div class="card">
+        <h2 class="text-xl font-semibold text-white mb-4">Pending Withdrawals</h2>
+        <div id="withdrawalsList" class="space-y-2">
+          <p class="text-gray-400 text-center py-8">No pending withdrawals</p>
+        </div>
+        <button id="refreshWithdrawalsBtn" class="btn btn-secondary w-full mt-4">Refresh</button>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="message" class="message"></div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
+
