@@ -155,12 +155,22 @@
 
     <!-- Connection Status -->
     <div id="connectionStatus" class="card mb-6">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between mb-4">
         <div>
           <p class="text-gray-400 text-sm">Wallet Status</p>
           <p id="walletAddress" class="text-white font-mono text-sm">Not connected</p>
         </div>
         <button id="connectWallet" class="btn btn-primary">Connect Wallet</button>
+      </div>
+      <div class="mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-gray-400 text-sm">Relay (from Registry)</label>
+          <button id="refreshRelaysBtn" class="btn btn-sm btn-secondary" title="Refresh relays">🔄</button>
+        </div>
+        <select id="relaySelector" class="input-field">
+          <option value="">Connect wallet to load relays...</option>
+        </select>
+        <p id="relayStatus" class="text-gray-500 text-xs mt-1">Relays are loaded from the on-chain registry</p>
       </div>
     </div>
 
@@ -186,6 +196,7 @@
       <button class="tab-button" data-tab="withdraw">Withdraw (L2→L1)</button>
       <button class="tab-button" data-tab="transfer">Transfer (L2→L2)</button>
       <button class="tab-button" data-tab="withdrawals">Pending Withdrawals</button>
+      <button class="tab-button" data-tab="sync">Sync Deposits</button>
     </div>
 
     <!-- Deposit Tab -->
@@ -248,10 +259,118 @@
     <div id="tab-withdrawals" class="tab-content hidden">
       <div class="card">
         <h2 class="text-xl font-semibold text-white mb-4">Pending Withdrawals</h2>
+        <div class="alert alert-info mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <div class="text-sm">
+            <p class="mb-1">Withdrawals must be included in a batch before you can generate a proof and complete the withdrawal on-chain.</p>
+            <p>If the relay is configured as a sequencer, you can manually submit a batch using the "Submit Batch" button below. Otherwise, wait for the sequencer to automatically submit batches.</p>
+          </div>
+        </div>
         <div id="withdrawalsList" class="space-y-2">
           <p class="text-gray-400 text-center py-8">No pending withdrawals</p>
         </div>
-        <button id="refreshWithdrawalsBtn" class="btn btn-secondary w-full mt-4">Refresh</button>
+        <div class="space-y-2 mt-4">
+          <button id="refreshWithdrawalsBtn" class="btn btn-secondary w-full">Refresh</button>
+          <button id="submitBatchBtn" class="btn btn-primary w-full hidden">Submit Batch (Sequencer Only)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sync Deposits Tab -->
+    <div id="tab-sync" class="tab-content hidden">
+      <div class="card">
+        <h2 class="text-xl font-semibold text-white mb-4">Sync Missed Deposits</h2>
+        <p class="text-gray-400 text-sm mb-4">
+          If the relay missed processing some deposits, you can sync them retroactively.
+          This will scan the blockchain for deposits and process any that weren't credited to your L2 balance.
+        </p>
+        
+        <div class="space-y-4">
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text text-gray-400">Sync Options</span>
+            </label>
+            <div class="space-y-2">
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" id="syncAllDeposits" class="checkbox checkbox-primary" checked>
+                <span class="text-gray-300 text-sm">Sync all deposits (from block 0 to latest)</span>
+              </label>
+              <label class="flex items-center space-x-2">
+                <input type="checkbox" id="syncMyDeposits" class="checkbox checkbox-primary" checked>
+                <span class="text-gray-300 text-sm">Sync only my deposits</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text text-gray-400">From Block (optional)</span>
+            </label>
+            <input type="number" id="syncFromBlock" class="input-field" placeholder="Leave empty to start from block 0">
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text text-gray-400">To Block (optional)</span>
+            </label>
+            <input type="text" id="syncToBlock" class="input-field" placeholder="Leave empty for 'latest'">
+          </div>
+
+          <button id="syncDepositsBtn" class="btn btn-primary w-full">Sync Deposits</button>
+        </div>
+
+        <div id="syncResults" class="mt-6 hidden">
+          <h3 class="text-lg font-semibold text-white mb-2">Sync Results</h3>
+          <div class="bg-gray-800 rounded-lg p-4 space-y-2">
+            <div class="flex justify-between">
+              <span class="text-gray-400">Total deposits found:</span>
+              <span id="syncTotal" class="text-white">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Processed:</span>
+              <span id="syncProcessed" class="text-green-400">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Skipped (already processed):</span>
+              <span id="syncSkipped" class="text-yellow-400">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-400">Failed:</span>
+              <span id="syncFailed" class="text-red-400">-</span>
+            </div>
+          </div>
+          <div id="syncErrors" class="mt-4 hidden">
+            <h4 class="text-sm font-semibold text-red-400 mb-2">Errors:</h4>
+            <div class="bg-red-900/20 rounded p-3 text-sm text-red-300 max-h-40 overflow-y-auto"></div>
+          </div>
+        </div>
+
+        <div class="flex items-center my-6">
+          <div class="flex-1 border-t border-gray-700"></div>
+          <span class="px-4 text-gray-500 text-sm">OR</span>
+          <div class="flex-1 border-t border-gray-700"></div>
+        </div>
+
+        <h3 class="text-lg font-semibold text-white mb-4">Process Specific Deposit</h3>
+        <p class="text-gray-400 text-sm mb-4">
+          If you know the transaction hash of a specific deposit that wasn't processed, you can process it directly.
+        </p>
+
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text text-gray-400">Transaction Hash</span>
+          </label>
+          <input type="text" id="processTxHash" class="input-field" placeholder="0x...">
+        </div>
+
+        <button id="processDepositBtn" class="btn btn-secondary w-full mt-4">Process Deposit</button>
+
+        <div id="processResult" class="mt-6 hidden">
+          <h3 class="text-lg font-semibold text-white mb-2">Processing Result</h3>
+          <div class="bg-gray-800 rounded-lg p-4 space-y-2">
+            <div id="processResultContent"></div>
+          </div>
+        </div>
       </div>
     </div>
 

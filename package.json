@@ -21,7 +21,7 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
-    "shogun-contracts-sdk": "^1.0.4",
-    "shogun-relay-sdk": "^1.0.1"
+    "shogun-contracts-sdk": "^1.0.9",
+    "shogun-relay-sdk": "^1.0.2"
   }
 }

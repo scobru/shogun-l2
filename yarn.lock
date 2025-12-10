@@ -519,17 +519,17 @@ rollup@^4.20.0:
     "@rollup/rollup-win32-x64-msvc" "4.53.3"
     fsevents "~2.3.2"
 
-shogun-contracts-sdk@^1.0.4:
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/shogun-contracts-sdk/-/shogun-contracts-sdk-1.0.6.tgz#13d5a2133e9953506d8c969488dfc85a7215f173"
-  integrity sha512-dFMF7phmg/Wuwf0wzhXTrVybu2uwGml4950g6jk70b6rlRzGoxAUcK1gbL1ohkn4biBa9PmrQOjWw/5tQVfcaA==
+shogun-contracts-sdk@^1.0.9:
+  version "1.0.9"
+  resolved "https://registry.yarnpkg.com/shogun-contracts-sdk/-/shogun-contracts-sdk-1.0.9.tgz#0c3ab392e95fbbcd868d91edbed8c4fbcec4d797"
+  integrity sha512-p62IFCWJwXR3xKf52cwCIHOq479KCIJpJtNVwHirCOxi3RYCvk4kP16Du8C4vj079oq+/bwjpDV6GZFSXwlumA==
   dependencies:
     ethers "^6.4.0"
 
-shogun-relay-sdk@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/shogun-relay-sdk/-/shogun-relay-sdk-1.0.1.tgz#516e6ced97251a76e8783fef4b2be19ec2f250e2"
-  integrity sha512-nM8bvZzwsCO6DWoRl+uFiDht45lhdJ5ib7M6RnTDzGqSVtyD1XNGXYpwgA2wtvPYcOtJGdVeVgZfaIyjZ22BXQ==
+shogun-relay-sdk@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/shogun-relay-sdk/-/shogun-relay-sdk-1.0.2.tgz#2fbb6dca547c25a48338e321b49ee46be66fc567"
+  integrity sha512-3PYuqB45/bB6AZPpXp2eI1HMJGUnlQwTQBkK/NC0/o3BTbMadsddFYGkNKcykF1nRxv8fiq0QhinhxCJkoBYCA==
   dependencies:
     axios "^1.6.0"
     form-data "^4.0.0"
