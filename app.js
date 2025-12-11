@@ -25,6 +25,86 @@ let gunKeypair = null; // GunDB keypair for encryption (derived from wallet sign
 let currentWithdrawalAmount = null; // Current withdrawal amount in wei (for proof checking)
 
 // ============================================
+// BATCHED WITHDRAWALS TRACKING (localStorage)
+// ============================================
+
+const BATCHED_WITHDRAWALS_KEY = 'shogun_batched_withdrawals';
+
+/**
+ * Get batched withdrawals from localStorage
+ */
+function getBatchedWithdrawals() {
+  try {
+    const data = localStorage.getItem(BATCHED_WITHDRAWALS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error('Failed to parse batched withdrawals:', e);
+    return [];
+  }
+}
+
+/**
+ * Save a withdrawal that was just batched (for later L1 claim)
+ */
+function saveBatchedWithdrawal(withdrawal) {
+  const withdrawals = getBatchedWithdrawals();
+  // Avoid duplicates based on user+nonce
+  const key = `${withdrawal.user.toLowerCase()}:${withdrawal.nonce}`;
+  const existing = withdrawals.findIndex(w => 
+    `${w.user.toLowerCase()}:${w.nonce}` === key
+  );
+  
+  if (existing >= 0) {
+    withdrawals[existing] = { ...withdrawal, batchedAt: Date.now() };
+  } else {
+    withdrawals.push({ ...withdrawal, batchedAt: Date.now() });
+  }
+  
+  localStorage.setItem(BATCHED_WITHDRAWALS_KEY, JSON.stringify(withdrawals));
+  console.log('Saved batched withdrawal:', withdrawal);
+}
+
+/**
+ * Remove a withdrawal after it's been claimed on L1
+ */
+function removeBatchedWithdrawal(user, nonce) {
+  const withdrawals = getBatchedWithdrawals();
+  const filtered = withdrawals.filter(w => 
+    !(w.user.toLowerCase() === user.toLowerCase() && w.nonce === nonce)
+  );
+  localStorage.setItem(BATCHED_WITHDRAWALS_KEY, JSON.stringify(filtered));
+  console.log('Removed batched withdrawal:', { user, nonce });
+}
+
+/**
+ * Get batched withdrawals for a specific user
+ */
+function getUserBatchedWithdrawals(userAddress) {
+  if (!userAddress) return [];
+  return getBatchedWithdrawals().filter(w => 
+    w.user.toLowerCase() === userAddress.toLowerCase()
+  );
+}
+
+/**
+ * Manually add a batched withdrawal for recovery
+ * This can be called from browser console: window.recoverBatchedWithdrawal(...)
+ */
+window.recoverBatchedWithdrawal = function(user, amount, nonce, batchId, txHash = null) {
+  saveBatchedWithdrawal({
+    user: user,
+    amount: amount.toString(),
+    nonce: nonce.toString(),
+    batchId: batchId,
+    txHash: txHash,
+    timestamp: Date.now()
+  });
+  console.log('Recovery: Batched withdrawal added to localStorage');
+  console.log('Refresh the page and check the Pending Withdrawals tab to claim it.');
+  return true;
+};
+
+// ============================================
 // UTILITY FUNCTIONS
 // ============================================
 
@@ -225,8 +305,21 @@ async function loadNetworkConfig() {
   // Force Base Sepolia
   currentChainId = 84532;
   
-  // Get contract configuration from SDK
-  const config = getConfigByChainId(currentChainId);
+  // Get contract configuration from SDK (fallback)
+  let config = getConfigByChainId(currentChainId);
+
+  // Try to get confirmation from relay
+  try {
+    const response = await fetch(`${currentRelayEndpoint}/api/v1/system/contracts`);
+    const data = await response.json();
+    if (data.success && data.contracts && data.chainId === currentChainId) {
+      config = data.contracts;
+      console.log('✅ Loaded contracts config from relay');
+    }
+  } catch (e) {
+    console.warn('⚠️ Failed to load contracts from relay, using SDK default:', e.message);
+  }
+
   if (!config || !config.gunL2Bridge) {
     showMessage('error', `GunL2Bridge not deployed on Base Sepolia`);
     return;
@@ -830,10 +923,12 @@ async function handleCheckProofAndWithdraw() {
     }
 
     // Withdraw on-chain
+    const batchIdBigInt = BigInt(proofResult.batchId);
     const tx = await gunL2Bridge.withdraw(
       amountWei,
       currentWithdrawalNonce,
-      proofResult.proof.proof
+      batchIdBigInt,
+      proofResult.proof
     );
 
     showMessage('info', `Transaction sent: ${tx.hash}. Waiting for confirmation...`);
@@ -1043,11 +1138,31 @@ document.getElementById('submitBatchBtn')?.addEventListener('click', async () =>
   
   try {
     const relay = getCurrentRelaySDK();
+    
+    // Get pending withdrawals BEFORE submitting batch (so we can save them to localStorage)
+    const pendingResult = await relay.bridge.getPendingWithdrawals();
+    const pendingWithdrawals = pendingResult.success ? pendingResult.withdrawals : [];
+    
     const result = await relay.bridge.submitBatch();
     
     if (result.success) {
-      showMessage('success', `Batch submitted successfully! Batch ID: ${result.batch.batchId}, TX: ${result.batch.txHash}`);
-      // Reload pending withdrawals to update the list
+      // Save the batched withdrawals to localStorage so user can claim them later
+      const batchId = result.batch.batchId;
+      const txHash = result.batch.txHash;
+      
+      pendingWithdrawals.forEach(w => {
+        saveBatchedWithdrawal({
+          user: w.user,
+          amount: w.amount,
+          nonce: w.nonce,
+          batchId: batchId,
+          txHash: txHash,
+          timestamp: w.timestamp || Date.now()
+        });
+      });
+      
+      showMessage('success', `Batch submitted successfully! Batch ID: ${batchId}, TX: ${txHash}`);
+      // Reload pending withdrawals to update the list (will now also show batched ones)
       await loadPendingWithdrawals();
       // Also update balances
       await updateBalances();
@@ -1094,7 +1209,14 @@ async function loadPendingWithdrawals() {
     const listEl = document.getElementById('withdrawalsList');
     listEl.innerHTML = '';
     
-    if (!result.success || result.withdrawals.length === 0) {
+    // Get batched withdrawals from localStorage (ready to claim)
+    const batchedWithdrawals = getUserBatchedWithdrawals(connectedAddress);
+    
+    // Check if we have any visible withdrawals
+    const hasPending = result.success && result.withdrawals && result.withdrawals.length > 0;
+    const hasBatched = batchedWithdrawals && batchedWithdrawals.length > 0;
+    
+    if (!hasPending && !hasBatched) {
       listEl.innerHTML = '<p class="text-gray-400 text-center py-8">No pending withdrawals</p>';
       document.getElementById('submitBatchBtn')?.classList.add('hidden');
       return;
@@ -1103,52 +1225,104 @@ async function loadPendingWithdrawals() {
     // Show submit batch button if there are any pending withdrawals (sequencer can submit)
     const submitBatchBtn = document.getElementById('submitBatchBtn');
     if (submitBatchBtn) {
-      submitBatchBtn.classList.remove('hidden');
+      if (hasPending) {
+        submitBatchBtn.classList.remove('hidden');
+      } else {
+        submitBatchBtn.classList.add('hidden');
+      }
     }
 
-    // Filter withdrawals for current user
-    const userWithdrawals = result.withdrawals.filter(
+    // Filter pending withdrawals for current user
+    const userWithdrawals = hasPending ? result.withdrawals.filter(
       w => w.user.toLowerCase() === connectedAddress.toLowerCase()
-    );
-
-    if (userWithdrawals.length === 0) {
+    ) : [];
+    
+    // Display "Ready to Claim" section for batched withdrawals
+    if (hasBatched) {
+      const readySection = document.createElement('div');
+      readySection.className = 'mb-6';
+      readySection.innerHTML = '<h3 class="text-green-400 font-semibold mb-3">✅ Ready to Claim (On-Chain)</h3>';
+      
+      batchedWithdrawals.forEach(withdrawal => {
+        const item = document.createElement('div');
+        item.className = 'withdrawal-item ready';
+        
+        const amountEth = formatEth(BigInt(withdrawal.amount));
+        const date = new Date(withdrawal.batchedAt || withdrawal.timestamp).toLocaleString();
+        
+        item.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-white font-semibold">${amountEth} ETH</p>
+              <p class="text-gray-400 text-sm">Batch: ${withdrawal.batchId}</p>
+              <p class="text-gray-400 text-sm">Nonce: ${withdrawal.nonce}</p>
+              <p class="text-gray-400 text-sm">${date}</p>
+            </div>
+            <button class="btn btn-sm btn-primary claim-btn" 
+                    data-amount="${withdrawal.amount}" 
+                    data-nonce="${withdrawal.nonce}"
+                    data-batch="${withdrawal.batchId}">
+              Withdraw Now
+            </button>
+          </div>
+        `;
+        
+        readySection.appendChild(item);
+      });
+      
+      listEl.appendChild(readySection);
+      
+      // Add event listeners to claim buttons
+      readySection.querySelectorAll('.claim-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleClaimWithdrawal(btn));
+      });
+    }
+    
+    // Display pending withdrawals section
+    if (userWithdrawals.length === 0 && !hasBatched) {
       listEl.innerHTML = '<p class="text-gray-400 text-center py-8">No pending withdrawals for your address</p>';
       // Still show submit batch button if there are other users' withdrawals
       return;
     }
+    
+    if (userWithdrawals.length > 0) {
+      const pendingSection = document.createElement('div');
+      pendingSection.innerHTML = '<h3 class="text-yellow-400 font-semibold mb-3">⏳ Pending (Waiting for Batch)</h3>';
 
-    // Get bridge state to check if batch is ready
-    const stateResult = await relay.bridge.getState();
-    const latestBatchId = stateResult.success ? stateResult.state.currentBatchId : null;
+      // Get bridge state to check if batch is ready
+      const stateResult = await relay.bridge.getState();
+      const latestBatchId = stateResult.success ? stateResult.state.currentBatchId : null;
 
-    userWithdrawals.forEach(withdrawal => {
-      const item = document.createElement('div');
-      item.className = 'withdrawal-item pending';
-      
-      const amountEth = formatEth(BigInt(withdrawal.amount));
-      const date = new Date(withdrawal.timestamp).toLocaleString();
-      
-      item.innerHTML = `
-        <div class="flex justify-between items-center">
-          <div>
-            <p class="text-white font-semibold">${amountEth} ETH</p>
-            <p class="text-gray-400 text-sm">Nonce: ${withdrawal.nonce}</p>
-            <p class="text-gray-400 text-sm">${date}</p>
+      userWithdrawals.forEach(withdrawal => {
+        const item = document.createElement('div');
+        item.className = 'withdrawal-item pending';
+        
+        const amountEth = formatEth(BigInt(withdrawal.amount));
+        const date = new Date(withdrawal.timestamp).toLocaleString();
+        
+        item.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-white font-semibold">${amountEth} ETH</p>
+              <p class="text-gray-400 text-sm">Nonce: ${withdrawal.nonce}</p>
+              <p class="text-gray-400 text-sm">${date}</p>
+            </div>
+            <button class="btn btn-sm btn-secondary check-proof-btn" 
+                    data-amount="${withdrawal.amount}" 
+                    data-nonce="${withdrawal.nonce}">
+              Check Proof
+            </button>
           </div>
-          <button class="btn btn-sm btn-secondary check-proof-btn" 
-                  data-amount="${withdrawal.amount}" 
-                  data-nonce="${withdrawal.nonce}">
-            Check Proof
-          </button>
-        </div>
-      `;
+        `;
+        
+        pendingSection.appendChild(item);
+      });
       
-      listEl.appendChild(item);
-    });
+      listEl.appendChild(pendingSection);
 
-    // Add event listeners to check proof buttons
-    document.querySelectorAll('.check-proof-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      // Add event listeners to check proof buttons
+      document.querySelectorAll('.check-proof-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
         const amount = btn.dataset.amount;
         const nonce = btn.dataset.nonce;
         const buttonId = `proof-btn-${nonce}`;
@@ -1168,15 +1342,35 @@ async function loadPendingWithdrawals() {
             const relay = getCurrentRelaySDK();
             const proofResult = await relay.bridge.getProof(connectedAddress, amount, nonce);
             
+            // Check if it's a pending status (202 response)
+            if (proofResult.status === 'pending') {
+              btn.disabled = false;
+              btn.textContent = 'Waiting for batch...';
+              showMessage('info', `Withdrawal is pending. ${proofResult.message || 'Waiting for batch submission.'}`);
+              return;
+            }
+
+            // Check if already processed
+            if (proofResult.status === 'already_processed') {
+              btn.disabled = false;
+              btn.textContent = 'Already Processed';
+              showMessage('success', proofResult.message || 'This withdrawal has already been processed. Check your wallet!');
+              await updateBalances();
+              await loadPendingWithdrawals();
+              return;
+            }
+
             if (proofResult.success && proofResult.proof) {
               const amountWei = BigInt(amount);
               const nonceBigInt = BigInt(nonce);
               
-              console.log('Calling withdraw on-chain:', { amount, nonce, proofLength: proofResult.proof.proof.length });
+              const batchIdBigInt = BigInt(proofResult.batchId);
+              console.log('Calling withdraw on-chain:', { amount, nonce, batchId: batchIdBigInt.toString(), proofLength: proofResult.proof.length });
               const tx = await gunL2Bridge.withdraw(
                 amountWei,
                 nonceBigInt,
-                proofResult.proof.proof
+                batchIdBigInt,
+                proofResult.proof
               );
               
               showMessage('info', `Transaction sent: ${tx.hash}. Waiting for confirmation...`);
@@ -1226,17 +1420,39 @@ async function loadPendingWithdrawals() {
           const relay = getCurrentRelaySDK();
           const proofResult = await relay.bridge.getProof(connectedAddress, amount, nonce);
           
+          // Check if it's a pending status (202 response)
+          if (proofResult.status === 'pending') {
+            btn.textContent = 'Waiting for batch...';
+            showMessage('info', `Withdrawal is pending. ${proofResult.message || 'Waiting for batch submission.'}`);
+            
+            // Start polling for proof
+            startProofPolling(connectedAddress, amount, nonce, buttonId);
+            return;
+          }
+
+          // Check if already processed
+          if (proofResult.status === 'already_processed') {
+            btn.disabled = false;
+            btn.textContent = 'Already Processed';
+            showMessage('success', proofResult.message || 'This withdrawal has already been processed. Check your wallet!');
+            await updateBalances();
+            await loadPendingWithdrawals();
+            return;
+          }
+
           if (proofResult.success && proofResult.proof) {
             // Proof available, can withdraw
             btn.textContent = 'Withdrawing...';
             const amountWei = BigInt(amount);
             const nonceBigInt = BigInt(nonce);
             
-            console.log('Calling withdraw on-chain:', { amount, nonce, proofLength: proofResult.proof.proof.length });
+            const batchIdBigInt = BigInt(proofResult.batchId);
+            console.log('Calling withdraw on-chain:', { amount, nonce, batchId: batchIdBigInt.toString(), proofLength: proofResult.proof.length });
             const tx = await gunL2Bridge.withdraw(
               amountWei,
               nonceBigInt,
-              proofResult.proof.proof
+              batchIdBigInt,
+              proofResult.proof
             );
             
             showMessage('info', `Transaction sent: ${tx.hash}. Waiting for confirmation...`);
@@ -1280,10 +1496,93 @@ async function loadPendingWithdrawals() {
           }
         }
       });
-    });
+      });
+    } // End of if (userWithdrawals.length > 0)
   } catch (error) {
     console.error('Failed to load withdrawals:', error);
     showMessage('error', `Failed to load withdrawals: ${error.message}`);
+  }
+}
+
+/**
+ * Handle claiming a batched withdrawal (from localStorage)
+ * This is called when user clicks "Withdraw Now" on a ready-to-claim withdrawal
+ */
+async function handleClaimWithdrawal(btn) {
+  const amount = btn.dataset.amount;
+  const nonce = btn.dataset.nonce;
+  const batchId = btn.dataset.batch;
+  
+  console.log('Claiming withdrawal:', { amount, nonce, batchId });
+  
+  try {
+    btn.disabled = true;
+    btn.textContent = 'Claiming...';
+    
+    const relay = getCurrentRelaySDK();
+    const proofResult = await relay.bridge.getProof(connectedAddress, amount, nonce);
+    
+    if (!proofResult.success || !proofResult.proof) {
+      btn.disabled = false;
+      btn.textContent = 'Withdraw Now';
+      showMessage('error', proofResult.error || 'Failed to get proof for withdrawal');
+      return;
+    }
+    
+    // Check if already processed
+    if (proofResult.status === 'already_processed') {
+      // Remove from localStorage since it's already done
+      removeBatchedWithdrawal(connectedAddress, nonce);
+      showMessage('success', 'This withdrawal has already been processed. Check your wallet!');
+      await updateBalances();
+      await loadPendingWithdrawals();
+      return;
+    }
+    
+    // Execute on-chain withdrawal
+    btn.textContent = 'Withdrawing...';
+    const amountWei = BigInt(amount);
+    const nonceBigInt = BigInt(nonce);
+    
+    const batchIdBigInt = BigInt(proofResult.batchId);
+    console.log('Calling withdraw on-chain:', { amount, nonce, batchId: batchIdBigInt.toString(), proofLength: proofResult.proof.length });
+    const tx = await gunL2Bridge.withdraw(
+      amountWei,
+      nonceBigInt,
+      batchIdBigInt,
+      proofResult.proof
+    );
+    
+    showMessage('info', `Transaction sent: ${tx.hash}. Waiting for confirmation...`);
+    console.log('Withdraw transaction sent:', tx.hash);
+    
+    const receipt = await tx.wait();
+    console.log('Withdraw transaction confirmed:', receipt);
+    
+    if (receipt.status === 1) {
+      // Success! Remove from localStorage
+      removeBatchedWithdrawal(connectedAddress, nonce);
+      showMessage('success', `Withdrawal successful! TX: ${receipt.hash}`);
+    } else {
+      showMessage('error', `Withdrawal transaction failed. TX: ${receipt.hash}`);
+      console.error('Transaction failed:', receipt);
+    }
+    
+    await updateBalances();
+    await loadPendingWithdrawals();
+  } catch (error) {
+    console.error('Failed to claim withdrawal:', error);
+    btn.disabled = false;
+    btn.textContent = 'Withdraw Now';
+    
+    const errorMsg = error.reason || error.message || 'Unknown error';
+    showMessage('error', `Withdrawal failed: ${errorMsg}`);
+    
+    if (error.code === 'ACTION_REJECTED') {
+      showMessage('warning', 'Transaction was rejected by user');
+    } else if (error.code === 'INSUFFICIENT_FUNDS') {
+      showMessage('error', 'Insufficient funds for gas fees');
+    }
   }
 }
 
@@ -1327,6 +1626,55 @@ document.getElementById('refreshRelaysBtn')?.addEventListener('click', async () 
 
 document.getElementById('syncDepositsBtn')?.addEventListener('click', () => handleSyncDeposits());
 document.getElementById('processDepositBtn')?.addEventListener('click', () => handleProcessDeposit());
+document.getElementById('reconcileBalanceBtn')?.addEventListener('click', () => handleReconcileBalance());
+
+async function handleReconcileBalance() {
+  if (!connectedAddress) {
+    showMessage('error', 'Please connect wallet first');
+    return;
+  }
+
+  try {
+    const restoreButton = setButtonLoading('reconcileBalanceBtn', 'Reconciling...');
+    
+    showMessage('info', 'Reconciling balance. This may take a moment...');
+    
+    const relay = getCurrentRelaySDK();
+    const result = await relay.bridge.reconcileBalance(connectedAddress);
+
+    if (result.success) {
+      // Show results
+      document.getElementById('reconcileResults').classList.remove('hidden');
+      document.getElementById('reconcileCurrentBalance').textContent = 
+        `${ethers.formatEther(result.currentBalance)} ETH (${result.currentBalance} wei)`;
+      document.getElementById('reconcileCalculatedBalance').textContent = 
+        `${ethers.formatEther(result.calculatedBalance)} ETH (${result.calculatedBalance} wei)`;
+      
+      const messageDiv = document.getElementById('reconcileMessage');
+      if (result.corrected) {
+        messageDiv.className = 'mt-2 text-sm text-green-400';
+        messageDiv.textContent = `✅ ${result.message}`;
+        showMessage('success', result.message);
+      } else {
+        messageDiv.className = 'mt-2 text-sm text-blue-400';
+        messageDiv.textContent = `ℹ️ ${result.message}`;
+        showMessage('info', result.message);
+      }
+
+      // Update balances
+      await updateBalances();
+    } else {
+      showMessage('error', `Reconciliation failed: ${result.error || 'Unknown error'}`);
+    }
+
+    restoreButton();
+  } catch (error) {
+    console.error('Reconcile balance failed:', error);
+    showMessage('error', `Reconciliation failed: ${error.message}`);
+    const restoreButton = setButtonLoading('reconcileBalanceBtn', 'Reconcile My Balance');
+    restoreButton();
+  }
+}
 
 async function handleSyncDeposits() {
   if (!connectedAddress) {
@@ -1504,14 +1852,142 @@ async function handleProcessDeposit() {
 // INITIALIZE ON LOAD
 // ============================================
 
+// ============================================
+// MANUAL BALANCE REFRESH
+// ============================================
+
+function setupBalanceRefreshButton() {
+  const refreshBtn = document.getElementById('refreshL2BalanceBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', async () => {
+      if (!connectedAddress) {
+        showMessage('error', 'Please connect wallet first');
+        return;
+      }
+      
+      const restoreButton = setButtonLoading('refreshL2BalanceBtn', '');
+      try {
+        await updateBalances();
+        showMessage('success', 'Balance refreshed');
+      } catch (error) {
+        console.error('Failed to refresh balance:', error);
+        showMessage('error', `Failed to refresh balance: ${error.message}`);
+      } finally {
+        restoreButton();
+      }
+    });
+  }
+}
+
+// ============================================
+// FORCE WITHDRAWAL (Anti-Censorship) HANDLERS
+// ============================================
+
+async function handleForceWithdraw() {
+  if (!sdk || !connectedAddress) {
+    showMessage('error', 'Please connect wallet first');
+    return;
+  }
+
+  const amountInput = document.getElementById('forceWithdrawAmount');
+  const nonceInput = document.getElementById('forceWithdrawNonce');
+  
+  const amount = amountInput.value;
+  const nonce = nonceInput.value;
+
+  if (!amount || parseFloat(amount) <= 0) {
+    showMessage('error', 'Please enter a valid amount');
+    return;
+  }
+  
+  if (!nonce || parseInt(nonce) < 0) {
+    showMessage('error', 'Please enter a valid nonce');
+    return;
+  }
+
+  const restoreButton = setButtonLoading('forceWithdrawBtn', 'Processing...');
+  
+  try {
+    const amountWei = ethers.parseEther(amount);
+    const bridge = sdk.getGunL2Bridge();
+    
+    showMessage('info', 'Initiating force withdrawal on L1...');
+    
+    const tx = await bridge.initiateForceWithdrawal(amountWei, BigInt(nonce));
+    const receipt = await tx.wait();
+    
+    showMessage('success', `Force withdrawal initiated! TX: ${receipt.hash}. You have 24 hours to wait for sequencer to process it.`);
+    
+  } catch (error) {
+    console.error('Force withdraw error:', error);
+    showMessage('error', `Force withdrawal failed: ${error.message}`);
+  } finally {
+    restoreButton();
+  }
+}
+
+async function handleProveCensorship() {
+  if (!sdk || !connectedAddress) {
+    showMessage('error', 'Please connect wallet first');
+    return;
+  }
+
+  const amountInput = document.getElementById('forceWithdrawAmount');
+  const nonceInput = document.getElementById('forceWithdrawNonce');
+  
+  const amount = amountInput.value;
+  const nonce = nonceInput.value;
+
+  if (!amount || parseFloat(amount) <= 0) {
+    showMessage('error', 'Please enter the amount from your force withdrawal request');
+    return;
+  }
+  
+  if (!nonce || parseInt(nonce) < 0) {
+    showMessage('error', 'Please enter the nonce from your force withdrawal request');
+    return;
+  }
+
+  const restoreButton = setButtonLoading('proveCensorshipBtn', 'Processing...');
+  
+  try {
+    const amountWei = ethers.parseEther(amount);
+    const bridge = sdk.getGunL2Bridge();
+    
+    showMessage('info', 'Proving censorship and freezing bridge...');
+    
+    const tx = await bridge.proveCensorship(connectedAddress, amountWei, BigInt(nonce));
+    const receipt = await tx.wait();
+    
+    showMessage('success', `Censorship proven! Bridge is now frozen. TX: ${receipt.hash}`);
+    
+  } catch (error) {
+    console.error('Prove censorship error:', error);
+    showMessage('error', `Failed to prove censorship: ${error.message}`);
+  } finally {
+    restoreButton();
+  }
+}
+
+function setupForceWithdrawHandlers() {
+  const forceWithdrawBtn = document.getElementById('forceWithdrawBtn');
+  if (forceWithdrawBtn) {
+    forceWithdrawBtn.addEventListener('click', handleForceWithdraw);
+  }
+  
+  const proveCensorshipBtn = document.getElementById('proveCensorshipBtn');
+  if (proveCensorshipBtn) {
+    proveCensorshipBtn.addEventListener('click', handleProveCensorship);
+  }
+}
+
+// ============================================
+// INITIALIZE ON LOAD
+// ============================================
+
 document.addEventListener('DOMContentLoaded', async () => {
   await loadNetworkConfig();
-  
-  // Auto-refresh balances every 30 seconds
-  setInterval(() => {
-    if (connectedAddress) {
-      updateBalances();
-    }
-  }, 30000);
+  setupBalanceRefreshButton();
+  setupForceWithdrawHandlers();
 });
 
