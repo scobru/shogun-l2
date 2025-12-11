@@ -220,6 +220,48 @@ function truncateAddress(address) {
 }
 
 /**
+ * Copy text to clipboard
+ */
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    // Fallback for older browsers
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (fallbackErr) {
+      console.error('Failed to copy to clipboard:', fallbackErr);
+      return false;
+    }
+  }
+}
+
+/**
+ * Show copy feedback
+ */
+function showCopyFeedback(element, originalText) {
+  const originalContent = element.innerHTML;
+  element.innerHTML = originalText || '✓ Copied!';
+  element.style.color = '#22c55e'; // green-500
+  
+  setTimeout(() => {
+    element.innerHTML = originalContent;
+    element.style.color = '';
+  }, 2000);
+}
+
+/**
  * Derive GunDB keypair from wallet signature
  */
 async function deriveGunKeypair() {
@@ -266,7 +308,7 @@ async function deriveGunKeypair() {
       epriv: credentials.epriv,
     };
     
-    console.log('✅ GunDB keypair derived successfully');
+    console.log('GunDB keypair derived successfully');
   } catch (error) {
     console.error('Failed to derive GunDB keypair:', error);
     showMessage('error', `Failed to derive keypair: ${error.message}`);
@@ -314,10 +356,10 @@ async function loadNetworkConfig() {
     const data = await response.json();
     if (data.success && data.contracts && data.chainId === currentChainId) {
       config = data.contracts;
-      console.log('✅ Loaded contracts config from relay');
+      console.log('Loaded contracts config from relay');
     }
   } catch (e) {
-    console.warn('⚠️ Failed to load contracts from relay, using SDK default:', e.message);
+    console.warn('Failed to load contracts from relay, using SDK default:', e.message);
   }
 
   if (!config || !config.gunL2Bridge) {
@@ -459,6 +501,7 @@ async function loadAvailableRelays() {
 function updateRelaySelector() {
   const selector = document.getElementById('relaySelector');
   const statusEl = document.getElementById('relayStatus');
+  const copyRelayBtn = document.getElementById('copyRelayAddressBtn');
   if (!selector) return;
 
   selector.innerHTML = '';
@@ -469,6 +512,9 @@ function updateRelaySelector() {
     option.textContent = relayRegistry ? 'No relays available' : 'Connect wallet to load relays...';
     selector.appendChild(option);
     selector.disabled = !relayRegistry;
+    if (copyRelayBtn) {
+      copyRelayBtn.classList.add('hidden');
+    }
     if (statusEl) {
       statusEl.textContent = relayRegistry 
         ? 'No active relays found in registry' 
@@ -489,6 +535,14 @@ function updateRelaySelector() {
     option.textContent = `${truncateAddress(relay.address)} - ${endpointDisplay}`;
     option.selected = selectedRelayAddress && selectedRelayAddress.toLowerCase() === relay.address.toLowerCase();
     selector.appendChild(option);
+  }
+  
+  // Show copy button if a relay is selected
+  if (copyRelayBtn && selectedRelayAddress) {
+    copyRelayBtn.classList.remove('hidden');
+    copyRelayBtn.setAttribute('data-relay-address', selectedRelayAddress);
+  } else if (copyRelayBtn) {
+    copyRelayBtn.classList.add('hidden');
   }
   
   // Update status
@@ -672,7 +726,16 @@ async function connectWallet() {
     }
 
     // Update UI
-    document.getElementById('walletAddress').textContent = truncateAddress(connectedAddress);
+    const walletAddressEl = document.getElementById('walletAddress');
+    walletAddressEl.textContent = truncateAddress(connectedAddress);
+    walletAddressEl.setAttribute('data-full-address', connectedAddress);
+    
+    // Show copy button
+    const copyWalletBtn = document.getElementById('copyWalletAddressBtn');
+    if (copyWalletBtn) {
+      copyWalletBtn.classList.remove('hidden');
+    }
+    
     document.getElementById('connectWallet').textContent = 'Connected';
     document.getElementById('connectWallet').disabled = true;
 
@@ -756,6 +819,9 @@ async function handleDeposit() {
     restoreButton();
     showMessage('success', `Deposit successful! TX: ${receipt.hash}`);
     
+    // Update bridge contract balance immediately (deposit increases it)
+    await updateBalances();
+    
     // Clear input
     amountInput.value = '';
     
@@ -777,12 +843,12 @@ async function handleDeposit() {
           
           // Check if balance has been updated (allowing for small rounding differences)
           if (currentBalance >= expectedBalance * 0.99) {
-            console.log(`✅ L2 balance updated: ${balanceResult.balanceEth} ETH`);
+            console.log(`L2 balance updated: ${balanceResult.balanceEth} ETH`);
             await updateBalances();
             showMessage('success', `L2 balance updated! Your deposit is now available.`);
             return; // Stop polling
           } else {
-            console.log(`⏳ Waiting for L2 balance update... (current: ${balanceResult.balanceEth} ETH, expected: ~${expectedBalance} ETH)`);
+            console.log(`Waiting for L2 balance update... (current: ${balanceResult.balanceEth} ETH, expected: ~${expectedBalance} ETH)`);
           }
         }
       } catch (error) {
@@ -824,10 +890,8 @@ async function handleRequestWithdraw() {
 
   try {
     const amountInput = document.getElementById('withdrawAmount');
-    const nonceInput = document.getElementById('withdrawNonce');
     
     const amountEth = parseFloat(amountInput.value);
-    const nonce = BigInt(nonceInput.value || Date.now().toString());
     
     if (!amountEth || amountEth <= 0) {
       showMessage('error', 'Please enter a valid amount');
@@ -846,35 +910,64 @@ async function handleRequestWithdraw() {
       return;
     }
 
-    // Create message for dual signatures
-    const message = JSON.stringify({
+    // Get next nonce from relay before creating signed message
+    let nextNonce = null;
+    try {
+      const nonceResult = await relay.bridge.getNonce(connectedAddress);
+      if (nonceResult.success && nonceResult.nextNonce) {
+        nextNonce = nonceResult.nextNonce;
+        console.log(`Got next nonce from relay: ${nextNonce}`);
+      } else {
+        throw new Error('Failed to get next nonce');
+      }
+    } catch (error) {
+      console.warn('Failed to get next nonce, will let relay auto-generate:', error);
+      // Fallback: let relay auto-generate (will fail verification but we'll fix in next attempt)
+      nextNonce = null;
+    }
+
+    // Create message for dual signatures (include nonce if we have it)
+    const messageData = {
       ethereumAddress: connectedAddress.toLowerCase(),
       amount: amountWei.toString(),
-      nonce: nonce.toString(),
       timestamp: Date.now(),
       type: 'withdrawal',
-    });
+    };
+    
+    // Include nonce in message if we have it (required for signature verification)
+    if (nextNonce) {
+      messageData.nonce = nextNonce;
+    }
+    
+    const message = JSON.stringify(messageData);
 
     // Create dual signatures
     const { seaSignature, ethSignature, gunPubKey } = await createDualSignatures(message);
 
-    // Request withdrawal
-    const result = await relay.bridge.withdraw({
+    // Request withdrawal (include nonce if we have it)
+    const withdrawPayload = {
       user: connectedAddress,
       amount: amountWei.toString(),
-      nonce: nonce.toString(),
       message,
       seaSignature,
       ethSignature,
       gunPubKey,
-    });
+    };
+    
+    // Include nonce if we have it
+    if (nextNonce) {
+      withdrawPayload.nonce = nextNonce;
+    }
+    
+    const result = await relay.bridge.withdraw(withdrawPayload);
 
     if (!result.success) {
       throw new Error(result.error || 'Withdrawal request failed');
     }
 
-    // Save withdrawal details for proof checking
-    currentWithdrawalNonce = nonce;
+    // Save withdrawal details for proof checking (get nonce from response)
+    const responseNonce = result.withdrawal?.nonce || result.nonce;
+    currentWithdrawalNonce = responseNonce ? BigInt(responseNonce) : null;
     currentWithdrawalAmount = amountWei;
     
     restoreButton();
@@ -883,9 +976,8 @@ async function handleRequestWithdraw() {
     // Show proof section
     document.getElementById('withdrawProofSection').classList.remove('hidden');
     
-    // Clear inputs
+    // Clear input
     amountInput.value = '';
-    nonceInput.value = '';
     
     // Update balances
     await updateBalances();
@@ -938,13 +1030,13 @@ async function handleCheckProofAndWithdraw() {
     restoreButton();
     showMessage('success', `Withdrawal successful! TX: ${receipt.hash}`);
     
+    // Update bridge contract balance immediately (withdrawal decreases it)
+    await updateBalances();
+    
     // Hide proof section
     document.getElementById('withdrawProofSection').classList.add('hidden');
     currentWithdrawalNonce = null;
     currentWithdrawalAmount = null;
-    
-    // Update balances
-    await updateBalances();
   } catch (error) {
     console.error('Withdrawal failed:', error);
     
@@ -1241,7 +1333,7 @@ async function loadPendingWithdrawals() {
     if (hasBatched) {
       const readySection = document.createElement('div');
       readySection.className = 'mb-6';
-      readySection.innerHTML = '<h3 class="text-green-400 font-semibold mb-3">✅ Ready to Claim (On-Chain)</h3>';
+      readySection.innerHTML = '<h3 class="text-green-400 font-semibold mb-3">Ready to Claim (On-Chain)</h3>';
       
       batchedWithdrawals.forEach(withdrawal => {
         const item = document.createElement('div');
@@ -1287,7 +1379,7 @@ async function loadPendingWithdrawals() {
     
     if (userWithdrawals.length > 0) {
       const pendingSection = document.createElement('div');
-      pendingSection.innerHTML = '<h3 class="text-yellow-400 font-semibold mb-3">⏳ Pending (Waiting for Batch)</h3>';
+      pendingSection.innerHTML = '<h3 class="text-yellow-400 font-semibold mb-3">Pending (Waiting for Batch)</h3>';
 
       // Get bridge state to check if batch is ready
       const stateResult = await relay.bridge.getState();
@@ -1590,15 +1682,6 @@ async function handleClaimWithdrawal(btn) {
 // RELAY SELECTION
 // ============================================
 
-document.getElementById('relaySelector')?.addEventListener('change', async (e) => {
-  const selectedAddress = e.target.value;
-  if (!selectedAddress) return;
-  
-  selectedRelayAddress = selectedAddress;
-  await initializeRelaySDK();
-  await updateBalances();
-  showMessage('success', 'Relay changed successfully');
-});
 
 document.getElementById('refreshRelaysBtn')?.addEventListener('click', async () => {
   if (!relayRegistry) {
@@ -1620,6 +1703,90 @@ document.getElementById('refreshRelaysBtn')?.addEventListener('click', async () 
   }
 });
 
+// Copy wallet address to clipboard
+document.getElementById('copyWalletAddressBtn')?.addEventListener('click', async () => {
+  const walletAddressEl = document.getElementById('walletAddress');
+  const fullAddress = walletAddressEl?.getAttribute('data-full-address');
+  
+  if (!fullAddress || fullAddress === 'Not connected') {
+    return;
+  }
+  
+  const success = await copyToClipboard(fullAddress);
+  if (success) {
+    showCopyFeedback(walletAddressEl, '✓ Copied!');
+    showMessage('success', 'Address copied to clipboard');
+  } else {
+    showMessage('error', 'Failed to copy address');
+  }
+});
+
+// Click on wallet address to copy
+document.getElementById('walletAddress')?.addEventListener('click', async () => {
+  const walletAddressEl = document.getElementById('walletAddress');
+  const fullAddress = walletAddressEl?.getAttribute('data-full-address');
+  
+  if (!fullAddress || fullAddress === 'Not connected') {
+    return;
+  }
+  
+  const success = await copyToClipboard(fullAddress);
+  if (success) {
+    showCopyFeedback(walletAddressEl, '✓ Copied!');
+    showMessage('success', 'Address copied to clipboard');
+  } else {
+    showMessage('error', 'Failed to copy address');
+  }
+});
+
+// Copy relay address to clipboard
+document.getElementById('copyRelayAddressBtn')?.addEventListener('click', async () => {
+  const copyBtn = document.getElementById('copyRelayAddressBtn');
+  const relayAddress = copyBtn?.getAttribute('data-relay-address');
+  
+  if (!relayAddress) {
+    return;
+  }
+  
+  const success = await copyToClipboard(relayAddress);
+  if (success) {
+    const icon = copyBtn.querySelector('svg');
+    if (icon) {
+      const originalColor = icon.getAttribute('class');
+      icon.setAttribute('class', originalColor.replace('text-gray-400', 'text-green-400'));
+      setTimeout(() => {
+        icon.setAttribute('class', originalColor);
+      }, 2000);
+    }
+    showMessage('success', 'Relay address copied to clipboard');
+  } else {
+    showMessage('error', 'Failed to copy relay address');
+  }
+});
+
+// Update copy button when relay selection changes
+document.getElementById('relaySelector')?.addEventListener('change', async (e) => {
+  const selectedAddress = e.target.value;
+  if (!selectedAddress) {
+    const copyRelayBtn = document.getElementById('copyRelayAddressBtn');
+    if (copyRelayBtn) {
+      copyRelayBtn.classList.add('hidden');
+    }
+    return;
+  }
+  
+  selectedRelayAddress = selectedAddress;
+  const copyRelayBtn = document.getElementById('copyRelayAddressBtn');
+  if (copyRelayBtn) {
+    copyRelayBtn.classList.remove('hidden');
+    copyRelayBtn.setAttribute('data-relay-address', selectedAddress);
+  }
+  
+  await initializeRelaySDK();
+  await updateBalances();
+  showMessage('success', 'Relay changed successfully');
+});
+
 // ============================================
 // SYNC DEPOSITS
 // ============================================
@@ -1627,15 +1794,25 @@ document.getElementById('refreshRelaysBtn')?.addEventListener('click', async () 
 document.getElementById('syncDepositsBtn')?.addEventListener('click', () => handleSyncDeposits());
 document.getElementById('processDepositBtn')?.addEventListener('click', () => handleProcessDeposit());
 document.getElementById('reconcileBalanceBtn')?.addEventListener('click', () => handleReconcileBalance());
+document.getElementById('reconcileBalanceBtnQuick')?.addEventListener('click', () => handleReconcileBalance('quick'));
+document.getElementById('reconcileBalanceBtnFromDeposit')?.addEventListener('click', () => handleReconcileBalance('deposit'));
 
-async function handleReconcileBalance() {
+async function handleReconcileBalance(source = 'default') {
   if (!connectedAddress) {
     showMessage('error', 'Please connect wallet first');
     return;
   }
 
+  // Determine which button was clicked
+  let buttonId = 'reconcileBalanceBtn';
+  if (source === 'quick') {
+    buttonId = 'reconcileBalanceBtnQuick';
+  } else if (source === 'deposit') {
+    buttonId = 'reconcileBalanceBtnFromDeposit';
+  }
+
   try {
-    const restoreButton = setButtonLoading('reconcileBalanceBtn', 'Reconciling...');
+    const restoreButton = setButtonLoading(buttonId, 'Reconciling...');
     
     showMessage('info', 'Reconciling balance. This may take a moment...');
     
@@ -1643,21 +1820,37 @@ async function handleReconcileBalance() {
     const result = await relay.bridge.reconcileBalance(connectedAddress);
 
     if (result.success) {
-      // Show results
-      document.getElementById('reconcileResults').classList.remove('hidden');
-      document.getElementById('reconcileCurrentBalance').textContent = 
-        `${ethers.formatEther(result.currentBalance)} ETH (${result.currentBalance} wei)`;
-      document.getElementById('reconcileCalculatedBalance').textContent = 
-        `${ethers.formatEther(result.calculatedBalance)} ETH (${result.calculatedBalance} wei)`;
+      // Show results in the detailed section if it exists (only in sync tab)
+      const reconcileResults = document.getElementById('reconcileResults');
+      if (reconcileResults) {
+        reconcileResults.classList.remove('hidden');
+        const currentBalanceEl = document.getElementById('reconcileCurrentBalance');
+        const calculatedBalanceEl = document.getElementById('reconcileCalculatedBalance');
+        const messageDiv = document.getElementById('reconcileMessage');
+        
+        if (currentBalanceEl) {
+          currentBalanceEl.textContent = 
+            `${ethers.formatEther(result.currentBalance)} ETH (${result.currentBalance} wei)`;
+        }
+        if (calculatedBalanceEl) {
+          calculatedBalanceEl.textContent = 
+            `${ethers.formatEther(result.calculatedBalance)} ETH (${result.calculatedBalance} wei)`;
+        }
+        if (messageDiv) {
+          if (result.corrected) {
+            messageDiv.className = 'mt-2 text-sm text-green-400';
+            messageDiv.textContent = `Success: ${result.message}`;
+          } else {
+            messageDiv.className = 'mt-2 text-sm text-blue-400';
+            messageDiv.textContent = `Info: ${result.message}`;
+          }
+        }
+      }
       
-      const messageDiv = document.getElementById('reconcileMessage');
+      // Show message
       if (result.corrected) {
-        messageDiv.className = 'mt-2 text-sm text-green-400';
-        messageDiv.textContent = `✅ ${result.message}`;
         showMessage('success', result.message);
       } else {
-        messageDiv.className = 'mt-2 text-sm text-blue-400';
-        messageDiv.textContent = `ℹ️ ${result.message}`;
         showMessage('info', result.message);
       }
 
@@ -1671,7 +1864,7 @@ async function handleReconcileBalance() {
   } catch (error) {
     console.error('Reconcile balance failed:', error);
     showMessage('error', `Reconciliation failed: ${error.message}`);
-    const restoreButton = setButtonLoading('reconcileBalanceBtn', 'Reconcile My Balance');
+    const restoreButton = setButtonLoading(buttonId, source === 'quick' ? 'Reconcile Balance' : (source === 'deposit' ? 'Reconcile L2 Balance' : 'Reconcile My Balance'));
     restoreButton();
   }
 }
@@ -1791,9 +1984,14 @@ async function handleProcessDeposit() {
           <div class="text-green-400 mb-2">${result.message}</div>
           ${result.deposit ? `
             <div class="space-y-1 text-sm">
-              <div class="flex justify-between">
+              <div class="flex justify-between items-center">
                 <span class="text-gray-400">User:</span>
-                <span class="text-white font-mono">${result.deposit.user}</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-white font-mono cursor-pointer hover:text-indigo-400 transition-colors copy-address" data-address="${result.deposit.user}" title="Click to copy">${result.deposit.user}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 hover:text-indigo-400 copy-address-icon cursor-pointer" data-address="${result.deposit.user}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-400">Amount:</span>
@@ -1812,6 +2010,25 @@ async function handleProcessDeposit() {
             </div>
           ` : ''}
         `;
+        
+        // Add click handlers for copy functionality
+        resultContent.querySelectorAll('.copy-address, .copy-address-icon').forEach(element => {
+          element.addEventListener('click', async () => {
+            const address = element.getAttribute('data-address');
+            if (address) {
+              const success = await copyToClipboard(address);
+              if (success) {
+                const addressSpan = resultContent.querySelector('.copy-address');
+                if (addressSpan) {
+                  showCopyFeedback(addressSpan, '✓ Copied!');
+                }
+                showMessage('success', 'Address copied to clipboard');
+              } else {
+                showMessage('error', 'Failed to copy address');
+              }
+            }
+          });
+        });
       } else {
         resultContent.innerHTML = `
           <div class="text-green-400">Deposit processed successfully!</div>
@@ -1918,6 +2135,9 @@ async function handleForceWithdraw() {
     
     showMessage('success', `Force withdrawal initiated! TX: ${receipt.hash}. You have 24 hours to wait for sequencer to process it.`);
     
+    // Update bridge contract balance (force withdrawal may affect contract state)
+    await updateBalances();
+    
   } catch (error) {
     console.error('Force withdraw error:', error);
     showMessage('error', `Force withdrawal failed: ${error.message}`);
@@ -1982,6 +2202,301 @@ function setupForceWithdrawHandlers() {
 }
 
 // ============================================
+// TRANSACTION EXPLORER
+// ============================================
+
+async function loadTransactions() {
+  if (!connectedAddress) {
+    const listEl = document.getElementById('transactionsList');
+    if (listEl) {
+      listEl.innerHTML = '<p class="text-gray-400 text-center py-8">Connect your wallet to view transaction history</p>';
+    }
+    return;
+  }
+
+  try {
+    const listEl = document.getElementById('transactionsList');
+    const summaryEl = document.getElementById('transactionsSummary');
+    
+    if (listEl) {
+      listEl.innerHTML = '<p class="text-gray-400 text-center py-8">Loading transactions...</p>';
+    }
+
+    const relay = getCurrentRelaySDK();
+    const result = await relay.bridge.getTransactions(connectedAddress);
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to load transactions');
+    }
+
+    // Update summary
+    if (summaryEl && result.summary) {
+      summaryEl.classList.remove('hidden');
+      document.getElementById('summaryDeposits').textContent = result.summary.deposits;
+      document.getElementById('summaryWithdrawals').textContent = result.summary.withdrawals;
+      document.getElementById('summaryTransfers').textContent = result.summary.transfers;
+    }
+
+    // Display transactions
+    if (listEl) {
+      if (result.transactions.length === 0) {
+        listEl.innerHTML = '<p class="text-gray-400 text-center py-8">No transactions found</p>';
+        return;
+      }
+
+      listEl.innerHTML = '';
+      result.transactions.forEach(tx => {
+        const item = document.createElement('div');
+        item.className = 'card p-4 hover:bg-gray-800/50 transition-colors';
+        
+        const typeColors = {
+          deposit: 'text-blue-400',
+          withdrawal: 'text-purple-400',
+          transfer: 'text-cyan-400'
+        };
+        
+        const typeIcons = {
+          deposit: '⬇️',
+          withdrawal: '⬆️',
+          transfer: '↔️'
+        };
+        
+        const statusBadges = {
+          pending: '<span class="badge badge-warning badge-sm">Pending</span>',
+          completed: '<span class="badge badge-success badge-sm">Completed</span>',
+          batched: '<span class="badge badge-info badge-sm">Batched</span>'
+        };
+
+        const date = new Date(tx.timestamp).toLocaleString();
+        const isOutgoing = tx.type === 'withdrawal' || (tx.type === 'transfer' && tx.from?.toLowerCase() === connectedAddress.toLowerCase());
+        const otherAddress = isOutgoing ? tx.to : tx.from;
+        
+        item.innerHTML = `
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex items-start gap-3 flex-1">
+              <div class="text-2xl">${typeIcons[tx.type]}</div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="${typeColors[tx.type]} font-semibold uppercase text-sm">${tx.type}</span>
+                  ${statusBadges[tx.status] || ''}
+                </div>
+                <p class="text-white font-semibold text-lg">${isOutgoing ? '-' : '+'}${tx.amountEth} ETH</p>
+                ${otherAddress ? `<p class="text-gray-400 text-sm mt-1">${isOutgoing ? 'To' : 'From'}: ${truncateAddress(otherAddress)}</p>` : ''}
+                ${tx.blockNumber ? `<p class="text-gray-500 text-xs mt-1">Block: ${tx.blockNumber}</p>` : ''}
+                <p class="text-gray-500 text-xs mt-1">${date}</p>
+              </div>
+            </div>
+            <div class="text-right">
+              ${tx.txHash ? `
+                <button class="btn btn-sm btn-ghost text-xs copy-tx-hash" data-tx="${tx.txHash}" title="Copy TX Hash">
+                  ${truncateAddress(tx.txHash, 8)}
+                </button>
+              ` : '<span class="text-gray-500 text-xs">No hash</span>'}
+            </div>
+          </div>
+        `;
+        
+        listEl.appendChild(item);
+      });
+
+      // Add copy handlers
+      listEl.querySelectorAll('.copy-tx-hash').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const txHash = btn.dataset.tx;
+          navigator.clipboard.writeText(txHash).then(() => {
+            showMessage('success', 'Transaction hash copied to clipboard');
+          });
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error loading transactions:', error);
+    const listEl = document.getElementById('transactionsList');
+    if (listEl) {
+      listEl.innerHTML = `<p class="text-red-400 text-center py-8">Error loading transactions: ${error.message}</p>`;
+    }
+    showMessage('error', `Failed to load transactions: ${error.message}`);
+  }
+}
+
+async function searchTransaction() {
+  const input = document.getElementById('searchTxHash');
+  const modal = document.getElementById('txDetailsModal');
+  const content = document.getElementById('txDetailsContent');
+  
+  if (!input || !modal || !content) return;
+  
+  const txHash = input.value.trim();
+  if (!txHash) {
+    showMessage('error', 'Please enter a transaction hash');
+    return;
+  }
+
+  try {
+    content.innerHTML = '<p class="text-gray-400 text-center py-8">Searching...</p>';
+    modal.classList.remove('hidden');
+    
+    const relay = getCurrentRelaySDK();
+    const result = await relay.bridge.getTransaction(txHash);
+
+    if (!result.success || !result.transaction) {
+      content.innerHTML = `
+        <div class="text-center py-8">
+          <p class="text-red-400 mb-2">Transaction not found</p>
+          <p class="text-gray-400 text-sm">${result.error || 'The transaction hash does not match any deposits, withdrawals, or transfers.'}</p>
+        </div>
+      `;
+      return;
+    }
+
+    const tx = result.transaction;
+    const typeColors = {
+      deposit: 'text-blue-400',
+      withdrawal: 'text-purple-400',
+      transfer: 'text-cyan-400'
+    };
+    
+    const date = new Date(tx.timestamp).toLocaleString();
+    
+    content.innerHTML = `
+      <div class="space-y-4">
+        <div class="flex items-center gap-2">
+          <span class="${typeColors[tx.type]} font-semibold uppercase">${tx.type}</span>
+          <span class="badge badge-${tx.status === 'completed' ? 'success' : tx.status === 'pending' ? 'warning' : 'info'} badge-sm">${tx.status}</span>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <p class="text-gray-400 text-sm mb-1">Amount</p>
+            <p class="text-white font-semibold text-lg">${tx.amountEth} ETH</p>
+            <p class="text-gray-500 text-xs">${tx.amount} wei</p>
+          </div>
+          <div>
+            <p class="text-gray-400 text-sm mb-1">Date</p>
+            <p class="text-white">${date}</p>
+          </div>
+        </div>
+        
+        ${tx.from ? `
+          <div>
+            <p class="text-gray-400 text-sm mb-1">From</p>
+            <p class="text-white font-mono text-sm">${tx.from}</p>
+          </div>
+        ` : ''}
+        
+        ${tx.to ? `
+          <div>
+            <p class="text-gray-400 text-sm mb-1">To</p>
+            <p class="text-white font-mono text-sm">${tx.to}</p>
+          </div>
+        ` : ''}
+        
+        ${tx.blockNumber ? `
+          <div>
+            <p class="text-gray-400 text-sm mb-1">Block Number</p>
+            <p class="text-white">${tx.blockNumber}</p>
+          </div>
+        ` : ''}
+        
+        ${tx.nonce ? `
+          <div>
+            <p class="text-gray-400 text-sm mb-1">Nonce</p>
+            <p class="text-white">${tx.nonce}</p>
+          </div>
+        ` : ''}
+        
+        <div>
+          <p class="text-gray-400 text-sm mb-1">Transaction Hash</p>
+          <div class="flex items-center gap-2">
+            <p class="text-white font-mono text-sm break-all">${tx.txHash || 'N/A'}</p>
+            ${tx.txHash ? `
+              <button class="btn btn-sm btn-ghost copy-btn" data-text="${tx.txHash}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Add copy handler
+    const copyBtn = content.querySelector('.copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        const text = copyBtn.dataset.text;
+        navigator.clipboard.writeText(text).then(() => {
+          showMessage('success', 'Copied to clipboard');
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error searching transaction:', error);
+    content.innerHTML = `
+      <div class="text-center py-8">
+        <p class="text-red-400 mb-2">Error</p>
+        <p class="text-gray-400 text-sm">${error.message}</p>
+      </div>
+    `;
+  }
+}
+
+function setupTransactionHandlers() {
+  // Refresh button
+  const refreshBtn = document.getElementById('refreshTransactionsBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', loadTransactions);
+  }
+
+  // Search button
+  const searchBtn = document.getElementById('searchTxBtn');
+  if (searchBtn) {
+    searchBtn.addEventListener('click', searchTransaction);
+  }
+
+  // Search on Enter key
+  const searchInput = document.getElementById('searchTxHash');
+  if (searchInput) {
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchTransaction();
+      }
+    });
+  }
+
+  // Close modal
+  const closeModal = document.getElementById('closeTxModal');
+  if (closeModal) {
+    closeModal.addEventListener('click', () => {
+      const modal = document.getElementById('txDetailsModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    });
+  }
+
+  // Close modal on backdrop click
+  const modal = document.getElementById('txDetailsModal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+      }
+    });
+  }
+
+  // Load transactions when tab is opened
+  document.querySelectorAll('.tab-button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.tab === 'transactions') {
+        loadTransactions();
+      }
+    });
+  });
+}
+
+// ============================================
 // INITIALIZE ON LOAD
 // ============================================
 
@@ -1989,5 +2504,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadNetworkConfig();
   setupBalanceRefreshButton();
   setupForceWithdrawHandlers();
+  setupTransactionHandlers();
 });
 

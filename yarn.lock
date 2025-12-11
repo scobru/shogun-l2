@@ -526,10 +526,10 @@ shogun-contracts-sdk@^1.1.1:
   dependencies:
     ethers "^6.4.0"
 
-shogun-relay-sdk@^1.1.2:
-  version "1.1.2"
-  resolved "https://registry.yarnpkg.com/shogun-relay-sdk/-/shogun-relay-sdk-1.1.2.tgz#c11bc083c4b8a5b163e1768aedcd2d3334c5a8ab"
-  integrity sha512-rK4U0KWk/d6SMBeIjuir45hskmpcjx5uzrKEyUxrz64vjelzSBoE57yM8lDyjvcWbuAp8fS7hnBB0s80/aRMDw==
+shogun-relay-sdk@^1.1.4:
+  version "1.1.4"
+  resolved "https://registry.yarnpkg.com/shogun-relay-sdk/-/shogun-relay-sdk-1.1.4.tgz#4bac9146f84fff9b870c067ef0c183102c1bfcde"
+  integrity sha512-ikxHwnvIqLYwEX+DytZJAvQKtsGfc2eYT8+2nJx73xQRudSPhIccfZi+phPwmX8TKfeAAAtrpdn3BxKGe6L3Jw==
   dependencies:
     axios "^1.6.0"
     form-data "^4.0.0"
