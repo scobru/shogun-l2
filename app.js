@@ -642,6 +642,154 @@ async function updateBalances() {
 }
 
 // ============================================
+// BALANCE VERIFICATION (Anti-Censorship)
+// ============================================
+
+document.getElementById('verifyBalanceBtn')?.addEventListener('click', handleVerifyBalance);
+
+/**
+ * Verify L2 balance against on-chain Merkle roots
+ * This allows users to independently verify their balance without trusting the relay
+ */
+async function handleVerifyBalance() {
+  if (!connectedAddress) {
+    showMessage('error', 'Please connect wallet first');
+    return;
+  }
+
+  const resultEl = document.getElementById('verificationResult');
+  const statusEl = document.getElementById('verificationStatus');
+  
+  if (!resultEl || !statusEl) return;
+  
+  // Show loading state
+  resultEl.classList.remove('hidden');
+  statusEl.innerHTML = `
+    <span class="loading loading-spinner loading-xs"></span>
+    <span>Verifying balance...</span>
+  `;
+
+  try {
+    const relay = getCurrentRelaySDK();
+    
+    // Get balance info with verification data
+    const response = await fetch(`${currentRelayEndpoint}/api/v1/bridge/balance-info/${connectedAddress}`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to get balance info');
+    }
+
+    if (!data.verification) {
+      // No verification data - user has no withdrawals yet
+      statusEl.innerHTML = `
+        <div class="flex items-center gap-2 text-yellow-400">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>No batch history yet</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Balance will be verifiable after your first withdrawal</p>
+      `;
+      return;
+    }
+
+    const { verification } = data;
+    
+    // Verify Merkle proof client-side if we have one
+    let proofValid = false;
+    if (verification.merkleProof && verification.lastBatchRoot && verification.lastWithdrawal) {
+      proofValid = verifyMerkleProof(
+        verification.merkleProof,
+        verification.lastBatchRoot,
+        connectedAddress,
+        verification.lastWithdrawal.amount,
+        verification.lastWithdrawal.nonce
+      );
+    }
+
+    // Build status display
+    const isVerified = verification.verifiedOnChain && proofValid;
+    const batchIdShort = verification.lastBatchId?.slice(0, 8) || 'N/A';
+    const timestamp = verification.lastBatchTimestamp 
+      ? new Date(verification.lastBatchTimestamp).toLocaleString()
+      : 'N/A';
+
+    if (isVerified) {
+      statusEl.innerHTML = `
+        <div class="flex items-center gap-2 text-green-400">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Verified ✓</span>
+        </div>
+        <div class="text-xs text-gray-400 mt-2 space-y-1">
+          <p>Batch: #${batchIdShort}</p>
+          <p>Last updated: ${timestamp}</p>
+          ${verification.lastBatchTxHash ? `<a href="https://sepolia.basescan.org/tx/${verification.lastBatchTxHash}" target="_blank" class="text-indigo-400 hover:underline">View on Explorer →</a>` : ''}
+        </div>
+      `;
+    } else {
+      statusEl.innerHTML = `
+        <div class="flex items-center gap-2 ${verification.verifiedOnChain ? 'text-yellow-400' : 'text-orange-400'}">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>${verification.verifiedOnChain ? 'Batch pending finalization' : 'Not yet finalized'}</span>
+        </div>
+        <div class="text-xs text-gray-400 mt-2 space-y-1">
+          <p>Batch: #${batchIdShort}</p>
+          <p>Proof valid: ${proofValid ? '✓' : '✗'}</p>
+          <p>On-chain: ${verification.verifiedOnChain ? '✓' : 'Pending (7 days)'}</p>
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error('Balance verification failed:', error);
+    statusEl.innerHTML = `
+      <div class="flex items-center gap-2 text-red-400">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span>Verification failed</span>
+      </div>
+      <p class="text-xs text-gray-400 mt-1">${error.message}</p>
+    `;
+  }
+}
+
+/**
+ * Verify Merkle proof client-side
+ * Uses the same algorithm as the smart contract
+ */
+function verifyMerkleProof(proof, root, user, amount, nonce) {
+  try {
+    // Compute leaf hash: keccak256(abi.encodePacked(user, amount, nonce))
+    const abiCoder = new ethers.AbiCoder();
+    const packed = ethers.solidityPacked(
+      ['address', 'uint256', 'uint256'],
+      [user, BigInt(amount), BigInt(nonce)]
+    );
+    let computedHash = ethers.keccak256(packed);
+
+    // Walk up the tree
+    for (const proofElement of proof) {
+      // Sort and hash (matches OpenZeppelin MerkleProof)
+      if (computedHash <= proofElement) {
+        computedHash = ethers.keccak256(ethers.concat([computedHash, proofElement]));
+      } else {
+        computedHash = ethers.keccak256(ethers.concat([proofElement, computedHash]));
+      }
+    }
+
+    return computedHash.toLowerCase() === root.toLowerCase();
+  } catch (error) {
+    console.error('Merkle proof verification error:', error);
+    return false;
+  }
+}
+
+// ============================================
 // WALLET CONNECTION
 // ============================================
 
@@ -1794,7 +1942,6 @@ document.getElementById('relaySelector')?.addEventListener('change', async (e) =
 document.getElementById('syncDepositsBtn')?.addEventListener('click', () => handleSyncDeposits());
 document.getElementById('processDepositBtn')?.addEventListener('click', () => handleProcessDeposit());
 document.getElementById('reconcileBalanceBtn')?.addEventListener('click', () => handleReconcileBalance());
-document.getElementById('reconcileBalanceBtnQuick')?.addEventListener('click', () => handleReconcileBalance('quick'));
 document.getElementById('reconcileBalanceBtnFromDeposit')?.addEventListener('click', () => handleReconcileBalance('deposit'));
 
 async function handleReconcileBalance(source = 'default') {
@@ -1805,9 +1952,7 @@ async function handleReconcileBalance(source = 'default') {
 
   // Determine which button was clicked
   let buttonId = 'reconcileBalanceBtn';
-  if (source === 'quick') {
-    buttonId = 'reconcileBalanceBtnQuick';
-  } else if (source === 'deposit') {
+  if (source === 'deposit') {
     buttonId = 'reconcileBalanceBtnFromDeposit';
   }
 
@@ -1864,7 +2009,7 @@ async function handleReconcileBalance(source = 'default') {
   } catch (error) {
     console.error('Reconcile balance failed:', error);
     showMessage('error', `Reconciliation failed: ${error.message}`);
-    const restoreButton = setButtonLoading(buttonId, source === 'quick' ? 'Reconcile Balance' : (source === 'deposit' ? 'Reconcile L2 Balance' : 'Reconcile My Balance'));
+    const restoreButton = setButtonLoading(buttonId, source === 'deposit' ? 'Reconcile L2 Balance' : 'Reconcile My Balance');
     restoreButton();
   }
 }

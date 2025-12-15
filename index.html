@@ -25,7 +25,7 @@
         <div class="navbar-title">
           <img src="./assets/imgs/logo.svg" alt="Shogun Logo" class="w-12 h-12" />
           <div>
-            <span class="font-semibold">shogun l2</span>
+            <span class="font-semibold text-white">shogun l2</span>
           </div>
         </div>
       </div>
@@ -34,493 +34,563 @@
     <main class="app-main">
       <!-- Header -->
       <div class="hero-gradient rounded-3xl p-8 md:p-12 mb-8 relative">
-      <div class="relative z-10">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-20 h-20 rounded-xl flex items-center justify-center shadow-lg p-2">
-            <img src="./assets/imgs/logo.svg" alt="Shogun Logo" class="w-full h-full" />
-          </div>
-          <div>
-            <h1 class="text-4xl md:text-5xl font-bold text-white mb-1">Shogun L2 Bridge</h1>
-            <p class="text-gray-300 text-sm md:text-base font-medium">Trustless ETH transfers between L1 and L2</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 mt-4">
-          <span class="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">Base Sepolia</span>
-          <span class="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-semibold">L2 Bridge</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Connection Status -->
-    <div id="connectionStatus" class="card mb-6">
-      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <div class="flex-1">
-          <p class="text-gray-400 text-sm font-medium mb-1">Wallet Status</p>
-          <div class="flex items-center gap-2">
-            <p id="walletAddress" class="text-white font-mono text-base font-semibold cursor-pointer hover:text-indigo-400 transition-colors" title="Click to copy full address">Not connected</p>
-            <button id="copyWalletAddressBtn" class="hidden opacity-70 hover:opacity-100 transition-opacity" title="Copy address to clipboard">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 hover:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <button id="connectWallet" class="btn btn-primary px-6 py-3 text-base font-semibold">
-          <span class="relative z-10">Connect Wallet</span>
-        </button>
-      </div>
-      <div class="pt-4 border-t border-white/10">
-        <div class="flex items-center justify-between mb-3">
-          <label class="block text-gray-300 text-sm font-semibold">Relay (from Registry)</label>
-          <button id="refreshRelaysBtn" class="btn btn-sm btn-secondary btn-circle w-8 h-8 p-0" title="Refresh relays">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-        </div>
-        <div class="flex items-center gap-2">
-          <select id="relaySelector" class="input-field flex-1">
-            <option value="">Connect wallet to load relays...</option>
-          </select>
-          <button id="copyRelayAddressBtn" class="hidden opacity-70 hover:opacity-100 transition-opacity p-2" title="Copy relay address to clipboard">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 hover:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </button>
-        </div>
-        <p id="relayStatus" class="text-gray-400 text-xs mt-2 font-medium">Relays are loaded from the on-chain registry</p>
-      </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-      <div class="stat-card">
-        <div class="flex items-center justify-center gap-3 mb-3">
-          <div class="stat-value" id="l2Balance">0 ETH</div>
-          <button id="refreshL2BalanceBtn" class="btn btn-sm btn-secondary btn-circle w-8 h-8 p-0 opacity-70 hover:opacity-100 transition-opacity" title="Refresh L2 balance">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-        </div>
-        <div class="stat-label">L2 Balance</div>
-        <button id="reconcileBalanceBtnQuick" class="btn btn-warning btn-sm w-full mt-3 py-2 text-xs font-semibold" title="Reconcile balance if it doesn't match deposits">
-          <span class="relative z-10">Reconcile Balance</span>
-        </button>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="l1Balance">0 ETH</div>
-        <div class="stat-label">L1 Balance</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="bridgeBalance">0 ETH</div>
-        <div class="stat-label">Bridge Contract</div>
-      </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="flex gap-2 mb-6 border-b border-white/10 flex-wrap overflow-x-auto pb-2">
-      <button class="tab-button active" data-tab="deposit">
-        <span class="relative z-10">Deposit (L1→L2)</span>
-      </button>
-      <button class="tab-button" data-tab="withdraw">
-        <span class="relative z-10">Withdraw (L2→L1)</span>
-      </button>
-      <button class="tab-button" data-tab="transfer">
-        <span class="relative z-10">Transfer (L2→L2)</span>
-      </button>
-      <button class="tab-button" data-tab="withdrawals">
-        <span class="relative z-10">Pending Withdrawals</span>
-      </button>
-      <button class="tab-button" data-tab="transactions">
-        <span class="relative z-10">Transaction Explorer</span>
-      </button>
-      <button class="tab-button" data-tab="emergency">
-        <span class="relative z-10">Force Withdraw</span>
-      </button>
-    </div>
-
-    <!-- Deposit Tab -->
-    <div id="tab-deposit" class="tab-content">
-      <div class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-600/20 flex items-center justify-center border border-indigo-500/30">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-          </div>
-          <h2 class="text-2xl font-bold text-white">Deposit ETH to L2</h2>
-        </div>
-        <div class="space-y-5">
-          <div>
-            <label class="block text-gray-300 text-sm font-semibold mb-2">Amount (ETH)</label>
-            <input type="number" id="depositAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
-          </div>
-          <button id="depositBtn" class="btn btn-primary w-full py-3 text-base font-semibold">
-            <span class="relative z-10">Deposit to L2</span>
-          </button>
-          <div class="mt-4 p-4 bg-blue-900/20 border border-blue-700/30 rounded-lg">
-            <p class="text-sm text-gray-300 mb-3">
-              <strong>Balance not updating after deposit?</strong><br>
-              If your deposit is confirmed on L1 but your L2 balance hasn't updated, use the button below to reconcile it.
-            </p>
-            <button id="reconcileBalanceBtnFromDeposit" class="btn btn-warning w-full py-2.5 text-sm font-semibold">
-              <span class="relative z-10">Reconcile L2 Balance</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Withdraw Tab -->
-    <div id="tab-withdraw" class="tab-content hidden">
-      <div class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-600/20 flex items-center justify-center border border-purple-500/30">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-            </svg>
-          </div>
-          <h2 class="text-2xl font-bold text-white">Withdraw ETH from L2</h2>
-        </div>
-        <div class="space-y-5">
-          <div>
-            <label class="block text-gray-300 text-sm font-semibold mb-2">Amount (ETH)</label>
-            <input type="number" id="withdrawAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
-          </div>
-          <button id="requestWithdrawBtn" class="btn btn-primary w-full py-3 text-base font-semibold">
-            <span class="relative z-10">Request Withdrawal</span>
-          </button>
-          <div id="withdrawProofSection" class="hidden">
-            <div class="mt-4 p-5 bg-gradient-to-br from-indigo-500/10 to-purple-600/10 rounded-xl border border-indigo-500/20">
-              <p class="text-sm text-gray-300 mb-3 font-medium">Withdrawal queued. Waiting for batch submission...</p>
-              <button id="checkProofBtn" class="btn btn-secondary w-full py-2.5 text-sm font-semibold">
-                <span class="relative z-10">Check Proof & Withdraw</span>
-              </button>
+        <div class="relative z-10">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-20 h-20 rounded-xl flex items-center justify-center shadow-lg p-2">
+              <img src="./assets/imgs/logo.svg" alt="Shogun Logo" class="w-full h-full" />
+            </div>
+            <div>
+              <h1 class="text-4xl md:text-5xl font-bold text-white mb-1">L2 Bridge</h1>
+              <p class="text-gray-300 text-sm md:text-base font-medium">Trustless ETH transfers between L1 and L2</p>
             </div>
           </div>
+          <div class="flex items-center gap-2 mt-4">
+            <span
+              class="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">Base
+              Sepolia</span>
+            <span
+              class="px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-semibold">L2
+              Bridge</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Transfer Tab -->
-    <div id="tab-transfer" class="tab-content hidden">
-      <div class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-600/20 flex items-center justify-center border border-blue-500/30">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-          </div>
-          <h2 class="text-2xl font-bold text-white">Transfer ETH (L2 → L2)</h2>
-        </div>
-        <div class="space-y-5">
-          <div>
-            <label class="block text-gray-300 text-sm font-semibold mb-2">To Address</label>
-            <input type="text" id="transferTo" class="input-field" placeholder="0x..." />
-          </div>
-          <div>
-            <label class="block text-gray-300 text-sm font-semibold mb-2">Amount (ETH)</label>
-            <input type="number" id="transferAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
-          </div>
-          <button id="transferBtn" class="btn btn-primary w-full py-3 text-base font-semibold">
-            <span class="relative z-10">Transfer</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Pending Withdrawals Tab -->
-    <div id="tab-withdrawals" class="tab-content hidden">
-      <div class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500/20 to-orange-600/20 flex items-center justify-center border border-yellow-500/30">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 class="text-2xl font-bold text-white">Pending Withdrawals</h2>
-        </div>
-        <div class="alert alert-info mb-6 p-4">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-            class="stroke-current shrink-0 w-6 h-6">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <div class="text-sm">
-            <p class="mb-2 font-semibold">Withdrawals must be included in a batch before you can generate a proof and complete the
-              withdrawal on-chain.</p>
-            <p class="text-gray-300">If the relay is configured as a sequencer, you can manually submit a batch using the "Submit Batch"
-              button below. Otherwise, wait for the sequencer to automatically submit batches.</p>
-          </div>
-        </div>
-        <div id="withdrawalsList" class="space-y-3">
-          <p class="text-gray-400 text-center py-12 font-medium">No pending withdrawals</p>
-        </div>
-        <div class="space-y-3 mt-6">
-          <button id="refreshWithdrawalsBtn" class="btn btn-secondary w-full py-2.5 font-semibold">
-            <span class="relative z-10">Refresh</span>
-          </button>
-          <button id="submitBatchBtn" class="btn btn-primary w-full py-2.5 font-semibold hidden">
-            <span class="relative z-10">Submit Batch (Sequencer Only)</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Transactions Explorer Tab -->
-    <div id="tab-transactions" class="tab-content hidden">
-      <div class="card">
-        <div class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 flex items-center justify-center border border-cyan-500/30">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <h2 class="text-2xl font-bold text-white">Transaction Explorer</h2>
-          </div>
-          <button id="refreshTransactionsBtn" class="btn btn-secondary btn-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </button>
-        </div>
-
-        <!-- Search by TX Hash -->
-        <div class="mb-6">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-gray-400">Search Transaction by Hash</span>
-            </label>
-            <div class="flex gap-2">
-              <input type="text" id="searchTxHash" class="input-field flex-1" placeholder="0x...">
-              <button id="searchTxBtn" class="btn btn-secondary">Search</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Summary Stats -->
-        <div id="transactionsSummary" class="grid grid-cols-3 gap-4 mb-6 hidden">
-          <div class="stat-card">
-            <div class="stat-value text-blue-400" id="summaryDeposits">0</div>
-            <div class="stat-label">Deposits</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value text-purple-400" id="summaryWithdrawals">0</div>
-            <div class="stat-label">Withdrawals</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value text-cyan-400" id="summaryTransfers">0</div>
-            <div class="stat-label">Transfers</div>
-          </div>
-        </div>
-
-        <!-- Transactions List -->
-        <div id="transactionsList" class="space-y-3">
-          <p class="text-gray-400 text-center py-8">Connect your wallet to view transaction history</p>
-        </div>
-
-        <!-- Transaction Details Modal (for search) -->
-        <div id="txDetailsModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div class="bg-gray-900 rounded-xl border border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between p-6 border-b border-gray-700">
-              <h3 class="text-xl font-bold text-white">Transaction Details</h3>
-              <button id="closeTxModal" class="text-gray-400 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      <!-- Connection Status -->
+      <div id="connectionStatus" class="card mb-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div class="flex-1">
+            <p class="text-gray-400 text-sm font-medium mb-1">Wallet Status</p>
+            <div class="flex items-center gap-2">
+              <p id="walletAddress"
+                class="text-white font-mono text-base font-semibold cursor-pointer hover:text-indigo-400 transition-colors"
+                title="Click to copy full address">Not connected</p>
+              <button id="copyWalletAddressBtn" class="hidden opacity-70 hover:opacity-100 transition-opacity"
+                title="Copy address to clipboard">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 hover:text-indigo-400" fill="none"
+                  viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               </button>
             </div>
-            <div id="txDetailsContent" class="p-6 space-y-4"></div>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Emergency Force Withdraw Tab -->
-    <div id="tab-emergency" class="tab-content hidden">
-      <div class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center border border-red-500/30">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 class="text-2xl font-bold text-white">Force Withdrawal (Anti-Censorship)</h2>
-        </div>
-        <div class="alert alert-warning mb-6 p-4">
-          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
-            viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div class="text-sm">
-            <p class="font-bold mb-1">Use only if the sequencer is censoring your withdrawal!</p>
-            <p class="text-gray-300">This initiates a 24-hour timer. If the sequencer doesn't process your withdrawal, the bridge can be
-              frozen.</p>
-          </div>
-        </div>
-        <div class="space-y-5">
-          <div>
-            <label class="block text-gray-300 text-sm font-semibold mb-2">Amount (ETH)</label>
-            <input type="number" id="forceWithdrawAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
-          </div>
-          <div>
-            <label class="block text-gray-300 text-sm font-semibold mb-2">Nonce</label>
-            <input type="number" id="forceWithdrawNonce" class="input-field" placeholder="0" min="0" />
-          </div>
-          <button id="forceWithdrawBtn" class="btn btn-warning w-full py-3 text-base font-semibold">
-            <span class="relative z-10">Initiate Force Withdrawal (L1)</span>
+          <button id="connectWallet" class="btn btn-primary px-6 py-3 text-base font-semibold">
+            <span class="relative z-10">Connect Wallet</span>
           </button>
         </div>
+        <div class="pt-4 border-t border-white/10">
+          <div class="flex items-center justify-between mb-3">
+            <label class="block text-gray-300 text-sm font-semibold">Relay (from Registry)</label>
+            <button id="refreshRelaysBtn" class="btn btn-sm btn-secondary btn-circle w-8 h-8 p-0"
+              title="Refresh relays">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="relaySelector" class="input-field flex-1">
+              <option value="">Connect wallet to load relays...</option>
+            </select>
+            <button id="copyRelayAddressBtn" class="hidden opacity-70 hover:opacity-100 transition-opacity p-2"
+              title="Copy relay address to clipboard">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 hover:text-indigo-400" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </div>
+          <p id="relayStatus" class="text-gray-400 text-xs mt-2 font-medium">Relays are loaded from the on-chain
+            registry</p>
+        </div>
+      </div>
 
-        <div class="divider my-8">OR</div>
+      <!-- Stats -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+        <div class="stat-card">
+          <div class="flex items-center justify-center gap-3 mb-3">
+            <div class="stat-value" id="l2Balance">0 ETH</div>
+            <button id="refreshL2BalanceBtn"
+              class="btn btn-sm btn-secondary btn-circle w-8 h-8 p-0 opacity-70 hover:opacity-100 transition-opacity"
+              title="Refresh L2 balance">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
+          <div class="stat-label">L2 Balance</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="l1Balance">0 ETH</div>
+          <div class="stat-label">L1 Balance</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="bridgeBalance">0 ETH</div>
+          <div class="stat-label">Bridge Contract</div>
+        </div>
+      </div>
 
-        <h3 class="text-xl font-bold text-white mb-3">Prove Censorship</h3>
-        <p class="text-gray-300 text-sm mb-5 font-medium">
-          If 24 hours have passed since you initiated a force withdrawal and it wasn't processed,
-          you can freeze the bridge by proving censorship.
-        </p>
-        <button id="proveCensorshipBtn" class="btn btn-error w-full py-3 text-base font-semibold">
-          <span class="relative z-10">Prove Censorship & Freeze Bridge</span>
+      <!-- Tabs -->
+      <div class="flex gap-2 mb-6 border-b border-white/10 flex-wrap overflow-x-auto pb-2">
+        <button class="tab-button active" data-tab="deposit">
+          <span class="relative z-10">Deposit (L1→L2)</span>
+        </button>
+        <button class="tab-button" data-tab="withdraw">
+          <span class="relative z-10">Withdraw (L2→L1)</span>
+        </button>
+        <button class="tab-button" data-tab="transfer">
+          <span class="relative z-10">Transfer (L2→L2)</span>
+        </button>
+        <button class="tab-button" data-tab="withdrawals">
+          <span class="relative z-10">Pending Withdrawals</span>
+        </button>
+        <button class="tab-button" data-tab="transactions">
+          <span class="relative z-10">Transaction Explorer</span>
+        </button>
+        <button class="tab-button" data-tab="emergency">
+          <span class="relative z-10">Force Withdraw</span>
         </button>
       </div>
-    </div>
 
-    <!-- Sync Deposits Tab -->
-    <div id="tab-sync" class="tab-content hidden">
-      <div class="card">
-        <div class="flex items-center gap-3 mb-6">
-          <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-600/20 flex items-center justify-center border border-green-500/30">
-            <span class="text-xl">🔧</span>
+      <!-- Deposit Tab -->
+      <div id="tab-deposit" class="tab-content">
+        <div class="card">
+          <div class="flex items-center gap-3 mb-6">
+            <div
+              class="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-600/20 flex items-center justify-center border border-indigo-500/30">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-400" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Deposit ETH to L2</h2>
           </div>
-          <h2 class="text-2xl font-bold text-white">Sync Missed Deposits</h2>
-        </div>
-        <p class="text-gray-300 text-sm mb-6 font-medium">
-          If the relay missed processing some deposits, you can sync them retroactively.
-          This will scan the blockchain for deposits and process any that weren't credited to your L2 balance.
-        </p>
+          <div class="space-y-5">
+            <div>
+              <label class="block text-gray-300 text-sm font-semibold mb-2">Amount (ETH)</label>
+              <input type="number" id="depositAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
+            </div>
+            <button id="depositBtn" class="btn btn-primary w-full py-3 text-base font-semibold">
+              <span class="relative z-10">Deposit to L2</span>
+            </button>
 
-        <div class="space-y-4">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-gray-400">Sync Options</span>
-            </label>
-            <div class="space-y-2">
-              <label class="flex items-center space-x-2">
-                <input type="checkbox" id="syncAllDeposits" class="checkbox checkbox-primary" checked>
-                <span class="text-gray-300 text-sm">Sync all deposits (from block 0 to latest)</span>
+            <!-- Balance Verification Section -->
+            <div class="mt-4 p-4 bg-green-900/20 border border-green-700/30 rounded-lg">
+              <p class="text-sm text-gray-300 mb-3">
+                <strong>Verify your L2 balance</strong><br>
+                Check that your balance matches the on-chain data for added security.
+              </p>
+              <button id="verifyBalanceBtn" class="btn btn-outline btn-success w-full py-2.5 text-sm font-semibold"
+                title="Verify your balance against on-chain data">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <span class="relative z-10">Verify Balance</span>
+              </button>
+              <div id="verificationResult" class="hidden mt-3 p-3 rounded-lg bg-gray-800/50 text-left">
+                <div id="verificationStatus" class="flex items-center gap-2 text-gray-300">
+                  <span class="loading loading-spinner loading-xs"></span>
+                  Checking...
+                </div>
+              </div>
+            </div>
+
+            <!-- Reconcile Balance Section -->
+            <div class="mt-4 p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
+              <p class="text-sm text-gray-300 mb-3">
+                <strong>Balance not updating after deposit?</strong><br>
+                If your deposit is confirmed on L1 but your L2 balance hasn't updated, use the button below to reconcile
+                it.
+              </p>
+              <button id="reconcileBalanceBtnFromDeposit" class="btn btn-warning w-full py-2.5 text-sm font-semibold">
+                <span class="relative z-10">Reconcile L2 Balance</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Withdraw Tab -->
+      <div id="tab-withdraw" class="tab-content hidden">
+        <div class="card">
+          <div class="flex items-center gap-3 mb-6">
+            <div
+              class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-600/20 flex items-center justify-center border border-purple-500/30">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-purple-400" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Withdraw ETH from L2</h2>
+          </div>
+          <div class="space-y-5">
+            <div>
+              <label class="block text-gray-300 text-sm font-semibold mb-2">Amount (ETH)</label>
+              <input type="number" id="withdrawAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
+            </div>
+            <button id="requestWithdrawBtn" class="btn btn-primary w-full py-3 text-base font-semibold">
+              <span class="relative z-10">Request Withdrawal</span>
+            </button>
+            <div id="withdrawProofSection" class="hidden">
+              <div
+                class="mt-4 p-5 bg-gradient-to-br from-indigo-500/10 to-purple-600/10 rounded-xl border border-indigo-500/20">
+                <p class="text-sm text-gray-300 mb-3 font-medium">Withdrawal queued. Waiting for batch submission...</p>
+                <button id="checkProofBtn" class="btn btn-secondary w-full py-2.5 text-sm font-semibold">
+                  <span class="relative z-10">Check Proof & Withdraw</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transfer Tab -->
+      <div id="tab-transfer" class="tab-content hidden">
+        <div class="card">
+          <div class="flex items-center gap-3 mb-6">
+            <div
+              class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-600/20 flex items-center justify-center border border-blue-500/30">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Transfer ETH (L2 → L2)</h2>
+          </div>
+          <div class="space-y-5">
+            <div>
+              <label class="block text-gray-300 text-sm font-semibold mb-2">To Address</label>
+              <input type="text" id="transferTo" class="input-field" placeholder="0x..." />
+            </div>
+            <div>
+              <label class="block text-gray-300 text-sm font-semibold mb-2">Amount (ETH)</label>
+              <input type="number" id="transferAmount" class="input-field" placeholder="0.0" step="0.001" min="0" />
+            </div>
+            <button id="transferBtn" class="btn btn-primary w-full py-3 text-base font-semibold">
+              <span class="relative z-10">Transfer</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending Withdrawals Tab -->
+      <div id="tab-withdrawals" class="tab-content hidden">
+        <div class="card">
+          <div class="flex items-center gap-3 mb-6">
+            <div
+              class="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500/20 to-orange-600/20 flex items-center justify-center border border-yellow-500/30">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Pending Withdrawals</h2>
+          </div>
+          <div class="alert alert-info mb-6 p-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+              class="stroke-current shrink-0 w-6 h-6">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="text-sm">
+              <p class="mb-2 font-semibold">Withdrawals must be included in a batch before you can generate a proof and
+                complete the
+                withdrawal on-chain.</p>
+              <p class="text-gray-300">If the relay is configured as a sequencer, you can manually submit a batch using
+                the "Submit Batch"
+                button below. Otherwise, wait for the sequencer to automatically submit batches.</p>
+            </div>
+          </div>
+          <div id="withdrawalsList" class="space-y-3">
+            <p class="text-gray-400 text-center py-12 font-medium">No pending withdrawals</p>
+          </div>
+          <div class="space-y-3 mt-6">
+            <button id="refreshWithdrawalsBtn" class="btn btn-secondary w-full py-2.5 font-semibold">
+              <span class="relative z-10">Refresh</span>
+            </button>
+            <button id="submitBatchBtn" class="btn btn-primary w-full py-2.5 font-semibold hidden">
+              <span class="relative z-10">Submit Batch (Sequencer Only)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transactions Explorer Tab -->
+      <div id="tab-transactions" class="tab-content hidden">
+        <div class="card">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 flex items-center justify-center border border-cyan-500/30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-cyan-400" fill="none" viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h2 class="text-2xl font-bold text-white">Transaction Explorer</h2>
+            </div>
+            <button id="refreshTransactionsBtn" class="btn btn-secondary btn-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
+
+          <!-- Search by TX Hash -->
+          <div class="mb-6">
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text text-gray-400">Search Transaction by Hash</span>
               </label>
-              <label class="flex items-center space-x-2">
-                <input type="checkbox" id="syncMyDeposits" class="checkbox checkbox-primary" checked>
-                <span class="text-gray-300 text-sm">Sync only my deposits</span>
-              </label>
+              <div class="flex gap-2">
+                <input type="text" id="searchTxHash" class="input-field flex-1" placeholder="0x...">
+                <button id="searchTxBtn" class="btn btn-secondary">Search</button>
+              </div>
             </div>
           </div>
 
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-gray-400">From Block (optional)</span>
-            </label>
-            <input type="number" id="syncFromBlock" class="input-field" placeholder="Leave empty to start from block 0">
+          <!-- Summary Stats -->
+          <div id="transactionsSummary" class="grid grid-cols-3 gap-4 mb-6 hidden">
+            <div class="stat-card">
+              <div class="stat-value text-blue-400" id="summaryDeposits">0</div>
+              <div class="stat-label">Deposits</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value text-purple-400" id="summaryWithdrawals">0</div>
+              <div class="stat-label">Withdrawals</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value text-cyan-400" id="summaryTransfers">0</div>
+              <div class="stat-label">Transfers</div>
+            </div>
           </div>
 
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text text-gray-400">To Block (optional)</span>
-            </label>
-            <input type="text" id="syncToBlock" class="input-field" placeholder="Leave empty for 'latest'">
+          <!-- Transactions List -->
+          <div id="transactionsList" class="space-y-3">
+            <p class="text-gray-400 text-center py-8">Connect your wallet to view transaction history</p>
           </div>
 
-          <button id="syncDepositsBtn" class="btn btn-primary w-full py-3 text-base font-semibold">
-            <span class="relative z-10">Sync Deposits</span>
+          <!-- Transaction Details Modal (for search) -->
+          <div id="txDetailsModal"
+            class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 rounded-xl border border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div class="flex items-center justify-between p-6 border-b border-gray-700">
+                <h3 class="text-xl font-bold text-white">Transaction Details</h3>
+                <button id="closeTxModal" class="text-gray-400 hover:text-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div id="txDetailsContent" class="p-6 space-y-4"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Emergency Force Withdraw Tab -->
+      <div id="tab-emergency" class="tab-content hidden">
+        <div class="card">
+          <div class="flex items-center gap-3 mb-6">
+            <div
+              class="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center border border-red-500/30">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Force Withdrawal (Anti-Censorship)</h2>
+          </div>
+          <div class="alert alert-warning mb-6 p-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
+              viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div class="text-sm">
+              <p class="font-bold mb-1">Use only if the sequencer is censoring your withdrawal!</p>
+              <p class="text-gray-300">This initiates a 24-hour timer. If the sequencer doesn't process your withdrawal,
+                the bridge can be
+                frozen.</p>
+            </div>
+          </div>
+          <div class="space-y-5">
+            <div>
+              <label class="block text-gray-300 text-sm font-semibold mb-2">Amount (ETH)</label>
+              <input type="number" id="forceWithdrawAmount" class="input-field" placeholder="0.0" step="0.001"
+                min="0" />
+            </div>
+            <div>
+              <label class="block text-gray-300 text-sm font-semibold mb-2">Nonce</label>
+              <input type="number" id="forceWithdrawNonce" class="input-field" placeholder="0" min="0" />
+            </div>
+            <button id="forceWithdrawBtn" class="btn btn-warning w-full py-3 text-base font-semibold">
+              <span class="relative z-10">Initiate Force Withdrawal (L1)</span>
+            </button>
+          </div>
+
+          <div class="divider my-8">OR</div>
+
+          <h3 class="text-xl font-bold text-white mb-3">Prove Censorship</h3>
+          <p class="text-gray-300 text-sm mb-5 font-medium">
+            If 24 hours have passed since you initiated a force withdrawal and it wasn't processed,
+            you can freeze the bridge by proving censorship.
+          </p>
+          <button id="proveCensorshipBtn" class="btn btn-error w-full py-3 text-base font-semibold">
+            <span class="relative z-10">Prove Censorship & Freeze Bridge</span>
           </button>
         </div>
+      </div>
 
-        <!-- Reconcile Balance Section -->
-        <div class="divider my-6"></div>
-        <div class="card bg-yellow-900/20 border-yellow-700">
-          <h3 class="text-lg font-semibold text-yellow-200 mb-2">Reconcile L2 Balance</h3>
-          <p class="text-gray-400 text-sm mb-4">
-            If your L2 balance doesn't match your deposits/withdrawals/transfers, use this to recalculate and fix it.
-            This is useful if you made L2 transfers before the balance update fix was implemented.
+      <!-- Sync Deposits Tab -->
+      <div id="tab-sync" class="tab-content hidden">
+        <div class="card">
+          <div class="flex items-center gap-3 mb-6">
+            <div
+              class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-600/20 flex items-center justify-center border border-green-500/30">
+              <span class="text-xl">🔧</span>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Sync Missed Deposits</h2>
+          </div>
+          <p class="text-gray-300 text-sm mb-6 font-medium">
+            If the relay missed processing some deposits, you can sync them retroactively.
+            This will scan the blockchain for deposits and process any that weren't credited to your L2 balance.
           </p>
-          <button id="reconcileBalanceBtn" class="btn btn-warning w-full py-3 text-base font-semibold">
-            <span class="relative z-10">Reconcile My Balance</span>
-          </button>
-          <div id="reconcileResults" class="mt-4 hidden">
+
+          <div class="space-y-4">
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text text-gray-400">Sync Options</span>
+              </label>
+              <div class="space-y-2">
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" id="syncAllDeposits" class="checkbox checkbox-primary" checked>
+                  <span class="text-gray-300 text-sm">Sync all deposits (from block 0 to latest)</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" id="syncMyDeposits" class="checkbox checkbox-primary" checked>
+                  <span class="text-gray-300 text-sm">Sync only my deposits</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text text-gray-400">From Block (optional)</span>
+              </label>
+              <input type="number" id="syncFromBlock" class="input-field"
+                placeholder="Leave empty to start from block 0">
+            </div>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text text-gray-400">To Block (optional)</span>
+              </label>
+              <input type="text" id="syncToBlock" class="input-field" placeholder="Leave empty for 'latest'">
+            </div>
+
+            <button id="syncDepositsBtn" class="btn btn-primary w-full py-3 text-base font-semibold">
+              <span class="relative z-10">Sync Deposits</span>
+            </button>
+          </div>
+
+          <!-- Reconcile Balance Section -->
+          <div class="divider my-6"></div>
+          <div class="card bg-yellow-900/20 border-yellow-700">
+            <h3 class="text-lg font-semibold text-yellow-200 mb-2">Reconcile L2 Balance</h3>
+            <p class="text-gray-400 text-sm mb-4">
+              If your L2 balance doesn't match your deposits/withdrawals/transfers, use this to recalculate and fix it.
+              This is useful if you made L2 transfers before the balance update fix was implemented.
+            </p>
+            <button id="reconcileBalanceBtn" class="btn btn-warning w-full py-3 text-base font-semibold">
+              <span class="relative z-10">Reconcile My Balance</span>
+            </button>
+            <div id="reconcileResults" class="mt-4 hidden">
+              <div class="bg-gray-800 rounded-lg p-4 space-y-2">
+                <div class="flex justify-between">
+                  <span class="text-gray-400">Current Balance:</span>
+                  <span id="reconcileCurrentBalance" class="text-white font-mono"></span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-400">Calculated Balance:</span>
+                  <span id="reconcileCalculatedBalance" class="text-white font-mono"></span>
+                </div>
+                <div id="reconcileMessage" class="mt-2 text-sm"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="syncResults" class="mt-6 hidden">
+            <h3 class="text-lg font-semibold text-white mb-2">Sync Results</h3>
             <div class="bg-gray-800 rounded-lg p-4 space-y-2">
               <div class="flex justify-between">
-                <span class="text-gray-400">Current Balance:</span>
-                <span id="reconcileCurrentBalance" class="text-white font-mono"></span>
+                <span class="text-gray-400">Total deposits found:</span>
+                <span id="syncTotal" class="text-white">-</span>
               </div>
               <div class="flex justify-between">
-                <span class="text-gray-400">Calculated Balance:</span>
-                <span id="reconcileCalculatedBalance" class="text-white font-mono"></span>
+                <span class="text-gray-400">Processed:</span>
+                <span id="syncProcessed" class="text-green-400">-</span>
               </div>
-              <div id="reconcileMessage" class="mt-2 text-sm"></div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Skipped (already processed):</span>
+                <span id="syncSkipped" class="text-yellow-400">-</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-400">Failed:</span>
+                <span id="syncFailed" class="text-red-400">-</span>
+              </div>
+            </div>
+            <div id="syncErrors" class="mt-4 hidden">
+              <h4 class="text-sm font-semibold text-red-400 mb-2">Errors:</h4>
+              <div class="bg-red-900/20 rounded p-3 text-sm text-red-300 max-h-40 overflow-y-auto"></div>
             </div>
           </div>
-        </div>
 
-        <div id="syncResults" class="mt-6 hidden">
-          <h3 class="text-lg font-semibold text-white mb-2">Sync Results</h3>
-          <div class="bg-gray-800 rounded-lg p-4 space-y-2">
-            <div class="flex justify-between">
-              <span class="text-gray-400">Total deposits found:</span>
-              <span id="syncTotal" class="text-white">-</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Processed:</span>
-              <span id="syncProcessed" class="text-green-400">-</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Skipped (already processed):</span>
-              <span id="syncSkipped" class="text-yellow-400">-</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-400">Failed:</span>
-              <span id="syncFailed" class="text-red-400">-</span>
-            </div>
+          <div class="flex items-center my-6">
+            <div class="flex-1 border-t border-gray-700"></div>
+            <span class="px-4 text-gray-500 text-sm">OR</span>
+            <div class="flex-1 border-t border-gray-700"></div>
           </div>
-          <div id="syncErrors" class="mt-4 hidden">
-            <h4 class="text-sm font-semibold text-red-400 mb-2">Errors:</h4>
-            <div class="bg-red-900/20 rounded p-3 text-sm text-red-300 max-h-40 overflow-y-auto"></div>
+
+          <h3 class="text-lg font-semibold text-white mb-4">Process Specific Deposit</h3>
+          <p class="text-gray-400 text-sm mb-4">
+            If you know the transaction hash of a specific deposit that wasn't processed, you can process it directly.
+          </p>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text text-gray-400">Transaction Hash</span>
+            </label>
+            <input type="text" id="processTxHash" class="input-field" placeholder="0x...">
           </div>
-        </div>
 
-        <div class="flex items-center my-6">
-          <div class="flex-1 border-t border-gray-700"></div>
-          <span class="px-4 text-gray-500 text-sm">OR</span>
-          <div class="flex-1 border-t border-gray-700"></div>
-        </div>
+          <button id="processDepositBtn" class="btn btn-secondary w-full mt-4 py-3 text-base font-semibold">
+            <span class="relative z-10">Process Deposit</span>
+          </button>
 
-        <h3 class="text-lg font-semibold text-white mb-4">Process Specific Deposit</h3>
-        <p class="text-gray-400 text-sm mb-4">
-          If you know the transaction hash of a specific deposit that wasn't processed, you can process it directly.
-        </p>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-gray-400">Transaction Hash</span>
-          </label>
-          <input type="text" id="processTxHash" class="input-field" placeholder="0x...">
-        </div>
-
-        <button id="processDepositBtn" class="btn btn-secondary w-full mt-4 py-3 text-base font-semibold">
-          <span class="relative z-10">Process Deposit</span>
-        </button>
-
-        <div id="processResult" class="mt-6 hidden">
-          <h3 class="text-lg font-semibold text-white mb-2">Processing Result</h3>
-          <div class="bg-gray-800 rounded-lg p-4 space-y-2">
-            <div id="processResultContent"></div>
+          <div id="processResult" class="mt-6 hidden">
+            <h3 class="text-lg font-semibold text-white mb-2">Processing Result</h3>
+            <div class="bg-gray-800 rounded-lg p-4 space-y-2">
+              <div id="processResultContent"></div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
       <!-- Messages -->
       <div id="message" class="message"></div>
