@@ -1304,6 +1304,12 @@ async function handleTransfer() {
       showMessage('error', 'Please enter a valid recipient address');
       return;
     }
+
+    // Prevent self-transfer
+    if (toAddress.toLowerCase() === connectedAddress.toLowerCase()) {
+      showMessage('error', 'Cannot transfer to your own address');
+      return;
+    }
     
     if (!amountEth || amountEth <= 0) {
       showMessage('error', 'Please enter a valid amount');
